@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<title>Meeting Scheduler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+<style>
+:root{
+  --bg:#0a0b0e;--panel:#13151a;--panel2:#1a1d23;--line:#25282f;--line2:#1e2026;
+  --ink:#f0f1f3;--dim:#8b8f99;--faint:#4a4e57;
+  --accent:#6366f1;--accent-bg:#1e1f4a;--accent-ink:#a5b4fc;
+  --good:#22c55e;--good-bg:#0f2a1a;--good-ink:#4ade80;
+  --warn:#f59e0b;--warn-bg:#2a1f0a;--warn-ink:#fbbf24;
+  --bad:#ef4444;--bad-bg:#2a0f0f;--bad-ink:#f87171;
+  --ext:#8b5cf6;--ext-bg:#1e1040;--ext-ink:#c4b5fd;
+  --sans:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+  --ease:160ms cubic-bezier(.4,0,.2,1);
+}
+[data-theme=light]{
+  --bg:#f4f5f7;--panel:#fff;--panel2:#f9fafb;--line:#e5e7eb;--line2:#f0f1f3;
+  --ink:#111318;--dim:#6b7280;--faint:#9ca3af;
+  --accent:#4f46e5;--accent-bg:#eef2ff;--accent-ink:#4338ca;
+  --good:#16a34a;--good-bg:#f0fdf4;--good-ink:#15803d;
+  --warn:#d97706;--warn-bg:#fffbeb;--warn-ink:#b45309;
+  --bad:#dc2626;--bad-bg:#fef2f2;--bad-ink:#b91c1c;
+  --ext:#7c3aed;--ext-bg:#f5f3ff;--ext-ink:#6d28d9;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body{font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--bg);min-height:100vh;overflow-x:hidden;transition:background .2s,color .2s}
+input,select,textarea,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+
+/* LAYOUT */
+.shell{min-height:100vh;display:flex;flex-direction:column;max-width:100vw}
+.topbar{height:52px;flex-shrink:0;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 14px;position:sticky;top:0;z-index:60}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;letter-spacing:-.02em}
+.brandmark{width:28px;height:28px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0}
+.spacer{flex:1}
+.icon-btn{width:32px;height:32px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--dim);display:flex;align-items:center;justify-content:center;font-size:16px;transition:all var(--ease)}
+.icon-btn:hover{background:var(--panel2);color:var(--ink);border-color:var(--line)}
+.who{display:flex;align-items:center;gap:7px;padding:3px 9px 3px 4px;background:var(--panel2);border:1px solid var(--line);border-radius:100px}
+.avatar{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.who-name{font-size:12px;font-weight:600;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-role{font-size:10px;color:var(--faint);font-family:var(--mono)}
+.main{flex:1;overflow-y:auto;overflow-x:hidden;min-width:0;max-width:100%;padding:18px 14px 90px}
+@media(min-width:900px){.main{padding:28px 36px 36px;max-width:1140px;margin:0 auto;width:100%}}
+
+/* TABS */
+.tabs-desktop{display:none;gap:0;margin-bottom:22px;border-bottom:1px solid var(--line)}
+@media(min-width:900px){.tabs-desktop{display:flex}}
+.tab-btn{padding:10px 18px;font-size:13px;font-weight:600;color:var(--dim);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all var(--ease)}
+.tab-btn:hover{color:var(--ink)}
+.tab-btn.active{color:var(--accent-ink);border-bottom-color:var(--accent)}
+.tabbar{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);padding:6px 4px max(6px,env(safe-area-inset-bottom));z-index:60;justify-content:space-around}
+@media(min-width:900px){.tabbar{display:none}}
+.tbb{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 10px;border:none;background:none;color:var(--faint);font-size:10px;font-weight:600;border-radius:8px}
+.tbb .ti{font-size:18px}
+.tbb.active{color:var(--accent)}
+
+/* PAGE HEADER */
+.ph{margin-bottom:20px}
+.ph-eyebrow{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--accent-ink);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.ph-title{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.ph-sub{font-size:12.5px;color:var(--dim);margin-top:3px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);font-size:13px;font-weight:600;background:var(--panel2);color:var(--ink);transition:all var(--ease);white-space:nowrap;text-decoration:none}
+.btn:hover{border-color:var(--faint)}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn-accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-accent:hover{filter:brightness(1.1)}
+.btn-danger{background:var(--bad-bg);color:var(--bad-ink);border-color:transparent}
+.btn-warn{background:var(--warn-bg);color:var(--warn-ink);border-color:transparent}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--dim)}
+.btn-ghost:hover{background:var(--panel2);color:var(--ink)}
+.btn-good{background:var(--good-bg);color:var(--good-ink);border-color:transparent}
+.btn-sm{padding:5px 10px;font-size:11.5px}
+.btn-icon{padding:6px;width:30px;height:30px}
+.btn-block{width:100%}
+
+/* FORM */
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.field input,.field select,.field textarea{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--ink);transition:border-color var(--ease);width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+.field input[readonly]{color:var(--dim);font-family:var(--mono);font-size:12.5px}
+.field textarea{resize:vertical;min-height:70px}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:440px){.r2{grid-template-columns:1fr}}
+.stack{display:flex;flex-direction:column;gap:12px}
+.toggle-row{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600}
+.toggle-row input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+
+/* PANEL */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.panel-head{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.panel-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px}
+.panel-title .ti{font-size:14px;color:var(--accent)}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--line2);font-size:12.5px;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--panel2)}
+.acts{display:flex;gap:5px;flex-wrap:wrap}
+.mono{font-family:var(--mono)}
+
+/* TAGS */
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700}
+.tag-int{background:var(--accent-bg);color:var(--accent-ink)}
+.tag-ext{background:var(--ext-bg);color:var(--ext-ink)}
+.tag-pub{background:var(--good-bg);color:var(--good-ink)}
+.tag-priv{background:var(--warn-bg);color:var(--warn-ink)}
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.03em}
+.b-good{background:var(--good-bg);color:var(--good-ink)}
+.b-bad{background:var(--bad-bg);color:var(--bad-ink)}
+.b-warn{background:var(--warn-bg);color:var(--warn-ink)}
+.b-muted{background:var(--panel2);color:var(--dim)}
+.b-accent{background:var(--accent-bg);color:var(--accent-ink)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;z-index:200;padding:0}
+@media(min-width:600px){.overlay{align-items:center;padding:16px}}
+.modal{background:var(--panel);border:1px solid var(--line);width:100%;max-width:480px;max-height:94vh;overflow-y:auto;border-radius:16px 16px 0 0;animation:slideup .2s ease}
+@media(min-width:600px){.modal{border-radius:16px;animation:popin .16s ease;max-width:520px}}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes popin{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-head{padding:18px 18px 0;display:flex;align-items:flex-start;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.modal-close{width:28px;height:28px;border-radius:7px;border:none;background:var(--panel2);color:var(--dim);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-body{padding:14px 18px}
+.modal-foot{padding:0 18px 18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* ALERTS */
+.alert{padding:9px 12px;border-radius:8px;font-size:12px;display:flex;align-items:flex-start;gap:7px;line-height:1.45}
+.a-bad{background:var(--bad-bg);color:var(--bad-ink)}
+.a-warn{background:var(--warn-bg);color:var(--warn-ink)}
+.a-info{background:var(--accent-bg);color:var(--accent-ink)}
+.a-good{background:var(--good-bg);color:var(--good-ink)}
+
+/* AUTH PAGES */
+.center-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 20% 10%,var(--accent-bg),transparent 50%),var(--bg)}
+.auth-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.auth-logo-text{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.auth-logo-sub{font-size:11px;color:var(--dim);font-family:var(--mono)}
+.theme-fab{position:fixed;top:14px;right:14px;z-index:10}
+
+/* CALENDAR / WEEK GRID */
+.ctrl-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.week-nav{display:flex;align-items:center;gap:6px}
+.week-lbl{font-size:13px;font-weight:700;min-width:160px;text-align:center;font-family:var(--mono)}
+.staff-sel{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:12.5px;font-weight:600;cursor:pointer;max-width:160px}
+
+/* DAYSTRIP */
+.daystrip{display:flex;gap:5px;overflow-x:auto;padding:1px 1px 6px;max-width:100%;-webkit-overflow-scrolling:touch}
+@media(min-width:900px){.daystrip{display:none}}
+.daystrip::-webkit-scrollbar{display:none}
+.daychip{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:46px;padding:7px 4px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.daychip .dn{font-family:var(--mono);font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+.daychip .dd{font-size:14px;font-weight:700}
+.daychip.today{border-color:var(--accent)}
+.daychip.active{background:var(--accent);border-color:var(--accent)}
+.daychip.active .dn,.daychip.active .dd{color:#fff}
+
+/* AGENDA (mobile) */
+.agenda{display:flex;flex-direction:column;gap:5px}
+@media(min-width:900px){.agenda{display:none}}
+.ag-row{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel);min-height:52px;cursor:pointer;transition:border-color var(--ease)}
+.ag-row:hover{border-color:var(--accent)}
+.ag-time{width:68px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--dim);background:var(--panel2);border-right:1px solid var(--line);padding:5px 3px;text-align:center;line-height:1.6}
+.ag-body{flex:1;display:flex;align-items:center;padding:0 11px;min-width:0}
+.ag-bar{width:3px;flex-shrink:0;border-radius:3px;align-self:stretch;margin:6px 0}
+.ag-info{flex:1;min-width:0;padding-left:9px}
+.ag-title{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-sub{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.ag-empty{color:var(--faint);font-size:12px;font-style:italic;padding-left:2px}
+.ag-add{display:flex;align-items:center;gap:6px;color:var(--faint);font-size:12px}
+.ag-row.past{opacity:.35;pointer-events:none}
+
+/* WEEK GRID (desktop) */
+.wgwrap{display:none;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+@media(min-width:900px){.wgwrap{display:block;overflow-x:auto}}
+.wg{display:grid;min-width:700px}
+.wg-corner{background:var(--panel2);border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+.wg-dh{background:var(--panel2);border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:8px 4px;text-align:center}
+.wg-dh:last-child{border-right:none}
+.wg-dn{font-family:var(--mono);font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
+.wg-dd{font-size:15px;font-weight:700;margin-top:1px}
+.wg-dh.today{background:var(--accent-bg)}
+.wg-dh.today .wg-dn,.wg-dh.today .wg-dd{color:var(--accent-ink)}
+.wg-tl{background:var(--panel2);border-right:1px solid var(--line);border-bottom:1px solid var(--line2);height:32px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+.wg-slot{height:32px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);position:relative;cursor:pointer;transition:background var(--ease)}
+.wg-slot:hover{background:var(--panel2)}
+.wg-slot.past{opacity:.32;pointer-events:none}
+.wg-slot.hourline{border-bottom-color:var(--line)}
+.wg-block{position:absolute;inset:1px;border-radius:4px;padding:2px 5px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.wg-block-title{font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.wg-block-sub{font-size:9px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.wg-plus{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;color:var(--accent);font-size:13px;transition:opacity var(--ease)}
+.wg-slot:hover .wg-plus{opacity:1}
+
+/* PARTICIPANT ROW */
+.prow{display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+.prow-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.prow-name{font-weight:600;font-size:13px;flex:1}
+.prow-role{font-size:11px;color:var(--dim)}
+.prow-rsvp{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600}
+.prow-rm{background:none;border:none;color:var(--faint);font-size:14px;padding:3px;cursor:pointer}
+.prow-rm:hover{color:var(--bad-ink)}
+
+/* RSVP DOT */
+.rsvp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rsvp-accepted{background:var(--good)}
+.rsvp-declined{background:var(--bad)}
+.rsvp-pending{background:var(--warn)}
+
+/* VIEW SECTION TITLE */
+.section-title{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;margin-top:14px}
+
+/* MEETING CARD (my meetings list) */
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color var(--ease)}
+.mcard:hover{border-color:var(--accent)}
+.mcard-bar{height:3px}
+.mcard-body{padding:12px 14px}
+.mcard-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+.mcard-title{font-size:13.5px;font-weight:700}
+.mcard-meta{font-size:11px;color:var(--dim);display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+.mcard-meta .ti{font-size:12px}
+
+/* NOTIFICATION BADGE */
+.notif-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;background:var(--bad);color:#fff;border-radius:100px;font-size:10px;font-weight:700;padding:0 4px}
+
+/* LOADING */
+.loading-page{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg)}
+.spin{width:24px;height:24px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.loading-text{font-size:12px;color:var(--dim);font-family:var(--mono)}
+
+/* TOAST */
+.toastwrap{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:300;pointer-events:none}
+@media(min-width:900px){.toastwrap{bottom:24px}}
+.toast{background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:100px;font-size:12.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transform:translateY(8px);transition:all .22s ease;white-space:nowrap}
+.toast.show{opacity:1;transform:translateY(0)}
+[data-theme=light] .toast{background:#111;color:#fff}
+
+/* HR */
+.hr{height:1px;background:var(--line2);margin:12px 0}
+
+/* PILL SELECT */
+.pill-group{display:flex;gap:5px;flex-wrap:wrap}
+.pill{padding:5px 12px;border-radius:100px;border:1px solid var(--line);background:var(--panel2);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--ease)}
+.pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pill:hover:not(.active){border-color:var(--faint)}
+
+/* ADMIN GRID */
+.adgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:780px){.adgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- CONFIG -->
+<div id="config-page" class="hidden">
+  <div class="center-page"><div class="auth-card">
+    <div class="auth-logo">
+      <div class="brandmark" style="width:36px;height:36px;border-radius:10px;font-size:17px"><i class="ti ti-calendar-event" aria-hidden="true"></i></div>
+      <div><div class="auth-logo-text">Meeting Scheduler</div><div class="auth-logo-sub">connect database</div></div>
+    </div>
+    <div class="alert a-info" style="margin-bottom:14px"><i class="ti ti-info-circle" aria-hidden="true"></i><span>Run <strong>schema_v2.sql</strong> in Supabase SQL Editor, then paste your credentials from <strong>Settings → API</strong>.</span></div>
+    <div class="stack">
+      <div class="field"><label>Project URL</label><input id="cfg-url" placeholder="https://xxxx.supabase.co"/></div>
+      <div class="field"><label>Anon key</label><input id="cfg-key" placeholder="eyJ…"/></div>
+      <div id="cfg-err" class="alert a-bad hidden"></div>
+      <button class="btn btn-accent btn-block" id="cfg-btn" onclick="saveConfig()"><i class="ti ti-plug" aria-hidden="true"></i>Connect</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-page" class="hidden">
+  <div class="loading-page"><div class="spin"></div><div class="loading-text" id="loading-msg">connecting…</div></div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-page" class="hidden">
+  <button class="icon-btn theme-fab" onclick="toggleTheme()"><i class="ti ti-moon" id="theme-icon-login" aria-hidden="true"></i></button>
+  <div class="center-page"><div class="auth-card">
+    <div class="auth-logo">
+      <div class="brandmark" style="width:36px;height:36px;border-radius:10px;font-size:17px"><i class="ti ti-calendar-event" aria-hidden="true"></i></div>
+      <div><div class="auth-logo-text">Meeting Scheduler</div><div class="auth-logo-sub">sign in to continue</div></div>
+    </div>
+    <div class="stack">
+      <div class="field"><label>Service number</label><input type="text" id="li-svc" placeholder="10001" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div class="field"><label>Password</label><input type="password" id="li-pwd" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div id="li-err" class="alert a-bad hidden"></div>
+      <button class="btn btn-accent btn-block" id="li-btn" onclick="doLogin()" style="padding:11px">Sign in</button>
+    </div>
+    <div style="margin-top:14px;text-align:center">
+      <button class="btn btn-ghost btn-sm" onclick="resetConfig()" style="font-size:11px">Change database</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- FORCE NEW PASSWORD -->
+<div id="newpwd-page" class="hidden">
+  <div class="center-page"><div class="auth-card">
+    <div class="auth-logo">
+      <div class="brandmark" style="width:36px;height:36px;border-radius:10px;font-size:17px"><i class="ti ti-shield-lock" aria-hidden="true"></i></div>
+      <div><div class="auth-logo-text">Set new password</div><div class="auth-logo-sub">required to continue</div></div>
+    </div>
+    <div class="alert a-info" style="margin-bottom:14px"><i class="ti ti-info-circle" aria-hidden="true"></i><span>Your password was set by admin. Please create your own secure password before continuing.</span></div>
+    <div class="stack">
+      <div class="field"><label>New password</label><input type="password" id="np-1" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSetNewPwd()"/></div>
+      <div class="field"><label>Confirm password</label><input type="password" id="np-2" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSetNewPwd()"/></div>
+      <div style="font-size:11px;color:var(--faint)">Min 8 characters, at least one letter and one number.</div>
+      <div id="np-err" class="alert a-bad hidden"></div>
+      <button class="btn btn-accent btn-block" id="np-btn" onclick="doSetNewPwd()" style="padding:11px">Set password &amp; continue</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- APP -->
+<div id="app-page" class="shell hidden">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brandmark"><i class="ti ti-calendar-event" aria-hidden="true"></i></div>
+      <span class="hidden" style="display:block" id="brand-text">Meeting Scheduler</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme"><i class="ti ti-moon" id="theme-icon" aria-hidden="true"></i></button>
+    <div class="who">
+      <div class="avatar" id="who-av"></div>
+      <div><div class="who-name" id="who-name"></div><div class="who-role" id="who-role"></div></div>
+    </div>
+    <button class="icon-btn" onclick="doLogout()" title="Sign out"><i class="ti ti-logout" aria-hidden="true"></i></button>
+  </header>
+
+  <main class="main">
+    <div class="tabs-desktop" id="tabs-d"></div>
+
+    <!-- CALENDAR TAB -->
+    <div id="tab-calendar">
+      <div class="ph"><div class="ph-eyebrow" id="cal-eyebrow">Calendar</div><div class="ph-title">Schedule</div><div class="ph-sub">Your meetings and bookings this week</div></div>
+      <div class="ctrl-row">
+        <div class="week-nav">
+          <button class="btn btn-icon btn-sm" onclick="prevWeek()"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
+          <span class="week-lbl" id="week-lbl"></span>
+          <button class="btn btn-icon btn-sm" onclick="nextWeek()"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+        </div>
+        <select class="staff-sel" id="staff-sel" onchange="onStaffChange()" title="View another staff member's schedule"></select>
+        <button class="btn btn-accent btn-sm" onclick="openNewMeetingModal()"><i class="ti ti-plus" aria-hidden="true"></i>New</button>
+        <button class="btn btn-icon btn-ghost btn-sm" onclick="renderCal()" title="Refresh"><i class="ti ti-refresh" aria-hidden="true"></i></button>
+      </div>
+      <div class="daystrip" id="day-strip"></div>
+      <div class="agenda" id="agenda"></div>
+      <div class="wgwrap"><div class="wg" id="wg"></div></div>
+    </div>
+
+    <!-- MEETINGS TAB -->
+    <div id="tab-meetings" class="hidden">
+      <div class="ph"><div class="ph-eyebrow">My Meetings</div><div class="ph-title">All Meetings</div><div class="ph-sub">Internal bookings and external meetings</div></div>
+      <div class="ctrl-row" style="margin-bottom:14px">
+        <div class="pill-group" id="meetings-filter">
+          <button class="pill active" data-filter="all" onclick="filterMeetings('all',this)">All</button>
+          <button class="pill" data-filter="internal" onclick="filterMeetings('internal',this)"><i class="ti ti-door" aria-hidden="true"></i> Internal</button>
+          <button class="pill" data-filter="external" onclick="filterMeetings('external',this)"><i class="ti ti-building" aria-hidden="true"></i> External</button>
+          <button class="pill" data-filter="upcoming" onclick="filterMeetings('upcoming',this)">Upcoming</button>
+          <button class="pill" data-filter="past" onclick="filterMeetings('past',this)">Past</button>
+        </div>
+        <button class="btn btn-accent btn-sm" onclick="openNewMeetingModal()"><i class="ti ti-plus" aria-hidden="true"></i>New</button>
+      </div>
+      <div id="meetings-list" class="stack"></div>
+    </div>
+
+    <!-- NOTIFICATIONS TAB -->
+    <div id="tab-notif" class="hidden">
+      <div class="ph"><div class="ph-eyebrow">Notifications</div><div class="ph-title">Invitations</div><div class="ph-sub">Meeting invitations and RSVPs</div></div>
+      <div id="notif-list" class="stack"></div>
+    </div>
+
+    <!-- ADMIN TAB -->
+    <div id="tab-admin" class="hidden">
+      <div class="ph"><div class="ph-eyebrow">Admin</div><div class="ph-title">Manage</div><div class="ph-sub">Staff, sections and rooms</div></div>
+      <div class="adgrid">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title"><i class="ti ti-tag" aria-hidden="true"></i>Sections</div><button class="btn btn-accent btn-sm" onclick="openModal('add-section')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
+          <div class="tbl-wrap"><table><thead><tr><th>Name</th><th></th></tr></thead><tbody id="sec-tbody"></tbody></table></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title"><i class="ti ti-door" aria-hidden="true"></i>Rooms</div><button class="btn btn-accent btn-sm" onclick="openModal('add-room')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
+          <div class="tbl-wrap"><table><thead><tr><th>Room</th><th>Cap.</th><th>Until</th><th></th></tr></thead><tbody id="rooms-tbody"></tbody></table></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title"><i class="ti ti-users" aria-hidden="true"></i>Staff</div><button class="btn btn-accent btn-sm" onclick="openModal('add-staff')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Svc no.</th><th>Name</th><th>Email</th><th>Section</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody id="staff-tbody"></tbody></table></div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="tabbar" id="tabbar"></nav>
+</div>
+
+<div id="modal-root"></div>
+<div class="toastwrap"><div class="toast" id="toast"></div></div>
+
+<script>
+/* =================== THEME =================== */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  const ic=t==='dark'?'ti-sun':'ti-moon';
+  ['theme-icon','theme-icon-login'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ti '+ic;});
+  localStorage.setItem('theme',t);
+}
+function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');}
+(()=>{const s=localStorage.getItem('theme');applyTheme(s||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));})();
+
+/* =================== UTILS =================== */
+const PALETTE=[
+  {bg:'rgba(99,102,241,.18)',tx:'#a5b4fc',br:'rgba(99,102,241,.4)'},
+  {bg:'rgba(34,197,94,.16)',tx:'#4ade80',br:'rgba(34,197,94,.35)'},
+  {bg:'rgba(245,158,11,.16)',tx:'#fbbf24',br:'rgba(245,158,11,.35)'},
+  {bg:'rgba(239,68,68,.15)',tx:'#f87171',br:'rgba(239,68,68,.35)'},
+  {bg:'rgba(56,189,248,.15)',tx:'#7dd3fc',br:'rgba(56,189,248,.35)'},
+  {bg:'rgba(232,121,249,.15)',tx:'#f0abfc',br:'rgba(232,121,249,.35)'},
+  {bg:'rgba(163,230,53,.15)',tx:'#bef264',br:'rgba(163,230,53,.35)'},
+  {bg:'rgba(251,146,60,.15)',tx:'#fdba74',br:'rgba(251,146,60,.35)'}
+];
+let _sc={};
+function getSC(name){if(!name)return{bg:'rgba(139,143,153,.15)',tx:'#8b8f99',br:'rgba(139,143,153,.3)'};if(!_sc[name])_sc[name]=PALETTE[Object.keys(_sc).length%PALETTE.length];return _sc[name];}
+function initials(n){return(n||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();}
+function esc(s){return(s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function dStr(d){return d.toISOString().split('T')[0];}
+const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function fTime(slot,sh=8){const h=Math.floor(slot/2)+sh;const m=slot%2===0?'00':'30';return`${String(h).padStart(2,'0')}:${m}`;}
+function pwdIssue(p){if(!p||p.length<8)return'Minimum 8 characters.';if(!/[0-9]/.test(p))return'Must include at least one number.';if(!/[A-Za-z]/.test(p))return'Must include at least one letter.';return null;}
+
+/* =================== SUPABASE REST =================== */
+let SB_URL='',SB_KEY='';
+function initSB(u,k){SB_URL=u.replace(/\/+$/,'');SB_KEY=k;}
+async function sbF(path,opts={}){
+  const res=await fetch(SB_URL+'/rest/v1/'+path,{...opts,headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Accept':'application/json',...(opts.headers||{})}});
+  if(opts.method==='DELETE'||(opts.method==='PATCH'&&res.status===204))return{data:null,error:null};
+  const text=await res.text();let data=null;
+  try{data=text?JSON.parse(text):null;}catch(e){return{data:null,error:{message:text}};}
+  if(!res.ok)return{data:null,error:{message:(data&&(data.message||data.hint))||text}};
+  return{data,error:null};
+}
+async function GET(t,p=''){const r=await sbF(t+(p?'?'+p:''),{method:'GET',headers:{'Prefer':'return=representation'}});if(r.error)throw new Error(r.error.message);return Array.isArray(r.data)?r.data:(r.data?[r.data]:[]);}
+async function POST(t,b){const r=await sbF(t,{method:'POST',body:JSON.stringify(b),headers:{'Prefer':'return=representation'}});if(r.error)throw new Error(r.error.message);return r.data;}
+async function PATCH(t,p,b){const r=await sbF(t+'?'+p,{method:'PATCH',body:JSON.stringify(b),headers:{'Prefer':'return=representation'}});if(r.error)throw new Error(r.error.message);return r.data;}
+async function DEL(t,p){const r=await sbF(t+'?'+p,{method:'DELETE'});if(r.error)throw new Error(r.error.message);}
+
+/* =================== CONFIG =================== */
+function loadCfg(){const u=localStorage.getItem('sb_url'),k=localStorage.getItem('sb_key');return u&&k?{u,k}:null;}
+async function saveConfig(){
+  const url=document.getElementById('cfg-url').value.trim(),key=document.getElementById('cfg-key').value.trim(),err=document.getElementById('cfg-err');
+  if(!url||!key){showAlert(err,'Both fields required.');return;}
+  if(!url.startsWith('https://')){showAlert(err,'URL must start with https://');return;}
+  document.getElementById('cfg-btn').disabled=true;initSB(url,key);showPage('loading');
+  try{const r=await sbF('staff?select=id&limit=1',{method:'GET'});if(r.error)throw new Error(r.error.message);localStorage.setItem('sb_url',url);localStorage.setItem('sb_key',key);showPage('login');}
+  catch(e){showPage('config');showAlert(err,'Connect failed: '+e.message);}
+  finally{document.getElementById('cfg-btn').disabled=false;}
+}
+function resetConfig(){localStorage.removeItem('sb_url');localStorage.removeItem('sb_key');showPage('config');}
+
+/* =================== STATE =================== */
+let U=null,weekOffset=0,selectedStaffId=null,selectedDayIdx=null;
+let DB={sections:[],rooms:[],staff:[],meetings:[],myParticipations:[]};
+let allMeetingsCache=[],meetingFilter='all';
+
+function showPage(p){['config','loading','login','newpwd','app'].forEach(x=>document.getElementById(x+'-page').classList.add('hidden'));document.getElementById(p+'-page').classList.remove('hidden');}
+
+/* =================== LOGIN =================== */
+async function doLogin(){
+  const svc=document.getElementById('li-svc').value.trim().toUpperCase(),pwd=document.getElementById('li-pwd').value;
+  const err=document.getElementById('li-err'),btn=document.getElementById('li-btn');
+  if(!svc||!pwd){showAlert(err,'Enter service number and password.');return;}
+  btn.disabled=true;btn.innerHTML='<div class="spin" style="width:15px;height:15px;border-width:2px;margin:0 auto"></div>';
+  err.classList.add('hidden');
+  try{
+    const rows=await GET('staff','select=*,sections(id,name)&svc_no=ilike.'+encodeURIComponent(svc)+'&active=eq.true');
+    if(!rows.length){showAlert(err,'Account not found or inactive.');return;}
+    const user=rows.find(r=>r.password===pwd);
+    if(!user){showAlert(err,'Incorrect password.');return;}
+    U=user;
+    if(user.must_reset_password){showPage('newpwd');document.getElementById('np-1').value='';document.getElementById('np-2').value='';document.getElementById('np-err').classList.add('hidden');return;}
+    enterApp();
+  }catch(e){showAlert(err,'Error: '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML='Sign in';}
+}
+async function doSetNewPwd(){
+  const p1=document.getElementById('np-1').value,p2=document.getElementById('np-2').value;
+  const err=document.getElementById('np-err'),btn=document.getElementById('np-btn');
+  const issue=pwdIssue(p1);if(issue){showAlert(err,issue);return;}
+  if(p1!==p2){showAlert(err,'Passwords do not match.');return;}
+  btn.disabled=true;btn.innerHTML='<div class="spin" style="width:15px;height:15px;border-width:2px;margin:0 auto"></div>';
+  try{await PATCH('staff','svc_no=eq.'+encodeURIComponent(U.svc_no),{password:p1,must_reset_password:false});U.password=p1;U.must_reset_password=false;showToast('Password updated');enterApp();}
+  catch(e){showAlert(err,'Error: '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML='Set password & continue';}
+}
+function doLogout(){U=null;weekOffset=0;selectedStaffId=null;selectedDayIdx=null;showPage('login');document.getElementById('li-svc').value='';document.getElementById('li-pwd').value='';}
+function enterApp(){
+  document.getElementById('who-av').textContent=initials(U.name);
+  document.getElementById('who-name').textContent=U.name;
+  document.getElementById('who-role').textContent=(U.sections?U.sections.name:(U.role==='admin'?'admin':'')).toLowerCase();
+  showPage('app');
+  loadAll().then(()=>{buildNav();switchTab('calendar');});
+}
+
+/* =================== DATA =================== */
+async function loadAll(){
+  const[secs,rooms,staff]=await Promise.all([
+    GET('sections','select=*&order=name.asc'),
+    GET('rooms','select=*&order=name.asc'),
+    GET('staff','select=*,sections(id,name)&order=name.asc&active=eq.true')
+  ]);
+  DB.sections=secs;DB.rooms=rooms;DB.staff=staff;
+  secs.forEach(s=>getSC(s.name));
+  selectedStaffId=U.id;
+}
+async function loadMeetingsForWeek(staffId){
+  const ws=getWS();const we=new Date(ws);we.setDate(we.getDate()+6);
+  const meetings=await GET('meetings',`select=*,participants(*)&date=gte.${dStr(ws)}&date=lte.${dStr(we)}&order=date.asc&order=start_slot.asc`);
+  // For each meeting, check if this staff participates or created it
+  DB.meetings=meetings;
+  return meetings;
+}
+async function loadAllMeetings(){
+  const data=await GET('meetings',`select=*,participants(*)&order=date.desc&order=start_slot.asc`);
+  allMeetingsCache=data;
+  return data;
+}
+async function loadMyNotifications(){
+  // Meetings where I'm a participant and RSVP is pending
+  const data=await GET('participants',`select=*,meetings(*)&staff_id=eq.${U.id}&rsvp=eq.pending`);
+  return data;
+}
+
+/* =================== NAV =================== */
+function buildNav(){
+  const isAdmin=U.role==='admin';
+  const tabs=[
+    {id:'calendar',icon:'ti-calendar-week',label:'Calendar'},
+    {id:'meetings',icon:'ti-layout-list',label:'Meetings'},
+    {id:'notif',icon:'ti-bell',label:'Inbox'},
+    ...(isAdmin?[{id:'admin',icon:'ti-adjustments',label:'Admin'}]:[])
+  ];
+  const tb=document.getElementById('tabbar');tb.innerHTML='';
+  tabs.forEach(t=>{
+    const b=document.createElement('button');b.className='tbb'+(t.id==='calendar'?' active':'');b.dataset.tab=t.id;
+    b.innerHTML=`<i class="ti ${t.icon}" aria-hidden="true"></i><span>${t.label}</span>`;
+    b.onclick=()=>switchTab(t.id);tb.appendChild(b);
+  });
+  const td=document.getElementById('tabs-d');td.innerHTML='';
+  tabs.forEach(t=>{
+    const b=document.createElement('button');b.className='tab-btn'+(t.id==='calendar'?' active':'');b.dataset.tab=t.id;
+    b.textContent=t.label;b.onclick=()=>switchTab(t.id);td.appendChild(b);
+  });
+  buildStaffSelect();
+}
+function switchTab(id){
+  ['calendar','meetings','notif','admin'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.add('hidden');});
+  document.getElementById('tab-'+id).classList.remove('hidden');
+  document.querySelectorAll('.tbb[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));
+  if(id==='calendar'){renderCal();}
+  else if(id==='meetings'){renderMeetingsList();}
+  else if(id==='notif'){renderNotifications();}
+  else if(id==='admin'){renderAdmin();}
+}
+
+/* =================== STAFF SELECT (view others' schedule) =================== */
+function buildStaffSelect(){
+  const sel=document.getElementById('staff-sel');
+  sel.innerHTML='<option value="">— My schedule —</option>'+DB.staff.filter(s=>s.id!==U.id).map(s=>`<option value="${s.id}">${esc(s.name)}${s.sections?' · '+esc(s.sections.name):''}</option>`).join('');
+  sel.value='';
+}
+function onStaffChange(){
+  const v=document.getElementById('staff-sel').value;
+  selectedStaffId=v?parseInt(v):U.id;
+  renderCal();
+}
+function getViewingUser(){return DB.staff.find(s=>s.id===selectedStaffId)||U;}
+
+/* =================== CALENDAR =================== */
+function getWS(){const n=new Date();n.setDate(n.getDate()+weekOffset*7);n.setDate(n.getDate()-n.getDay());n.setHours(0,0,0,0);return n;}
+function prevWeek(){weekOffset--;selectedDayIdx=null;renderCal();}
+function nextWeek(){weekOffset++;selectedDayIdx=null;renderCal();}
+
+async function renderCal(){
+  const ws=getWS();const we=new Date(ws);we.setDate(we.getDate()+6);
+  const s=dStr(ws),e=dStr(we);
+  document.getElementById('week-lbl').textContent=`${ws.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${we.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+  const viewing=getViewingUser();
+  const isViewingSelf=viewing.id===U.id;
+  const ey=document.getElementById('cal-eyebrow');
+  ey.textContent=isViewingSelf?`${(U.sections?U.sections.name:'').toUpperCase()} · CALENDAR`:`VIEWING: ${viewing.name.toUpperCase()}`;
+
+  // Fetch meetings visible in this week
+  let meetings=[];
+  try{meetings=await GET('meetings',`select=*,participants(*)&date=gte.${s}&date=lte.${e}&order=start_slot.asc`);}catch(e_){console.error(e_);}
+
+  // Filter to meetings relevant for the viewed staff
+  const viewMeetings=meetings.filter(m=>{
+    if(m.created_by===viewing.id)return true;
+    return m.participants&&m.participants.some(p=>p.staff_id===viewing.id);
+  });
+
+  const today=new Date();today.setHours(0,0,0,0);
+  const dates=Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});
+  if(selectedDayIdx===null){const ti=dates.findIndex(d=>d.getTime()===today.getTime());selectedDayIdx=ti>=0?ti:0;}
+  if(selectedDayIdx>6)selectedDayIdx=6;if(selectedDayIdx<0)selectedDayIdx=0;
+
+  renderDayStrip(dates,today);
+  renderAgenda(dates[selectedDayIdx],today,viewMeetings,isViewingSelf);
+  renderWeekGrid(dates,today,viewMeetings,isViewingSelf);
+}
+
+function renderDayStrip(dates,today){
+  const strip=document.getElementById('day-strip');strip.innerHTML='';let ac=null;
+  dates.forEach((d,i)=>{
+    const isToday=d.getTime()===today.getTime();
+    const chip=document.createElement('button');chip.className='daychip'+(isToday?' today':'')+(i===selectedDayIdx?' active':'');
+    chip.innerHTML=`<span class="dn">${DN[d.getDay()]}</span><span class="dd">${d.getDate()}</span>`;
+    chip.onclick=()=>{selectedDayIdx=i;renderCal();};
+    if(i===selectedDayIdx)ac=chip;
+    strip.appendChild(chip);
+  });
+  if(ac)requestAnimationFrame(()=>{const sr=strip.getBoundingClientRect(),cr=ac.getBoundingClientRect();strip.scrollLeft+=(cr.left+cr.width/2)-(sr.left+sr.width/2);});
+}
+
+function getMeetingsForSlot(date,slot,meetings){
+  const ds=dStr(date);
+  return meetings.filter(m=>m.date===ds&&slot>=m.start_slot&&slot<m.start_slot+m.duration);
+}
+function canSeeMeetingDetails(m){
+  if(m.privacy==='public')return true;
+  if(U.role==='admin')return true;
+  if(m.created_by===U.id)return true;
+  return m.participants&&m.participants.some(p=>p.staff_id===U.id);
+}
+function meetingColor(m){
+  if(m.type==='external')return{bg:'var(--ext-bg)',tx:'var(--ext-ink)',br:'var(--ext-bg)'};
+  const sec=m.section_name;return getSC(sec);
+}
+
+function renderAgenda(date,today,meetings,isViewingSelf){
+  const agenda=document.getElementById('agenda');agenda.innerHTML='';
+  const SH=8,EH=20,SLOTS=(EH-SH)*2;
+  const isPastDay=date<today;const ds=dStr(date);
+  const rendered=new Set();
+  for(let s=0;s<SLOTS;s++){
+    const slotMs=meetings.filter(m=>m.date===ds&&s>=m.start_slot&&s<m.start_slot+m.duration);
+    const newMs=slotMs.filter(m=>m.start_slot===s);
+    const isOccupied=slotMs.length>0;
+    if(isOccupied&&newMs.length===0)continue;
+
+    const row=document.createElement('div');row.className='ag-row'+(isPastDay?' past':'');
+    const tc=document.createElement('div');tc.className='ag-time';
+    const bc=document.createElement('div');bc.className='ag-body';
+
+    if(newMs.length>0){
+      const m=newMs[0];rendered.add(m.id);
+      const c=meetingColor(m);const canSee=canSeeMeetingDetails(m);
+      tc.innerHTML=`<span>${fTime(m.start_slot)}</span><span>${fTime(m.start_slot+m.duration)}</span>`;
+      const typeLabel=m.type==='external'?'<i class="ti ti-building" aria-hidden="true"></i>':'<i class="ti ti-door" aria-hidden="true"></i>';
+      const title=canSee?esc(m.title):'Meeting (private)';
+      const sub=canSee?(m.type==='internal'?esc(m.location||''):'External · '+esc(m.location||'')):esc(m.section_name||'');
+      bc.innerHTML=`<div class="ag-bar" style="background:${c.tx}"></div><div class="ag-info"><div class="ag-title">${typeLabel} ${title}</div><div class="ag-sub">${sub}</div></div>`;
+      row.onclick=()=>viewMeetingModal(m);
+    } else {
+      tc.innerHTML=`<span>${fTime(s)}</span><span>${fTime(s+1)}</span>`;
+      if(!isPastDay&&isViewingSelf){bc.innerHTML='<div class="ag-add"><i class="ti ti-plus" aria-hidden="true"></i>Schedule</div>';row.onclick=()=>openNewMeetingModal(dStr(date),s);}
+      else{bc.innerHTML='<div class="ag-empty">Free</div>';}
+    }
+    row.appendChild(tc);row.appendChild(bc);agenda.appendChild(row);
+  }
+}
+
+function renderWeekGrid(dates,today,meetings,isViewingSelf){
+  const SH=8,EH=20,SLOTS=(EH-SH)*2;
+  const grid=document.getElementById('wg');
+  grid.style.gridTemplateColumns=`56px repeat(7,1fr)`;grid.innerHTML='';
+  const corner=document.createElement('div');corner.className='wg-corner';grid.appendChild(corner);
+  dates.forEach((d,i)=>{
+    const isToday=d.getTime()===today.getTime();
+    const h=document.createElement('div');h.className='wg-dh'+(isToday?' today':'');
+    if(i===6)h.style.borderRight='none';
+    h.innerHTML=`<div class="wg-dn">${DN[d.getDay()]}</div><div class="wg-dd">${d.getDate()}</div>`;grid.appendChild(h);
+  });
+  for(let s=0;s<SLOTS;s++){
+    const hourline=s%2===1;
+    const tl=document.createElement('div');tl.className='wg-tl';if(s===SLOTS-1)tl.style.borderBottom='none';tl.textContent=fTime(s);grid.appendChild(tl);
+    dates.forEach((d,di)=>{
+      const cell=document.createElement('div');cell.className='wg-slot'+(hourline?' hourline':'');
+      const isPast=d<today;if(s===SLOTS-1)cell.style.borderBottom='none';if(di===6)cell.style.borderRight='none';
+      if(isPast)cell.classList.add('past');
+      const ds=dStr(d);
+      const bks=meetings.filter(m=>m.date===ds&&s>=m.start_slot&&s<m.start_slot+m.duration);
+      const newMs=bks.filter(m=>m.start_slot===s);
+      if(newMs.length>0){
+        const m=newMs[0];const c=meetingColor(m);const canSee=canSeeMeetingDetails(m);
+        cell.style.background=c.bg;
+        const blk=document.createElement('div');blk.className='wg-block';blk.style.cssText=`background:${c.bg};border:1px solid ${c.br}`;
+        const title=canSee?esc(m.title):'Private';
+        blk.innerHTML=`<div class="wg-block-title" style="color:${c.tx}">${title}</div><div class="wg-block-sub" style="color:${c.tx}">${esc(m.section_name||'')}</div>`;
+        cell.appendChild(blk);cell.onclick=()=>viewMeetingModal(m);
+      } else if(bks.length>0){
+        const m=bks[0];const c=meetingColor(m);cell.style.background=c.bg;
+      } else if(!isPast&&isViewingSelf){
+        const plus=document.createElement('div');plus.className='wg-plus';plus.innerHTML='<i class="ti ti-plus" aria-hidden="true"></i>';cell.appendChild(plus);
+        cell.onclick=()=>openNewMeetingModal(ds,s);
+      }
+      grid.appendChild(cell);
+    });
+  }
+}
+
+/* =================== NEW MEETING MODAL =================== */
+function openNewMeetingModal(preDate,preSlot){
+  const roomOpts=DB.rooms.map(r=>`<option value="${r.id}">${esc(r.name)} (cap. ${r.capacity||'?'})</option>`).join('');
+  const today=new Date().toISOString().split('T')[0];
+  const preD=preDate||today;
+  const preS=preSlot||16;// default 08:00
+  let timeOpts='';for(let i=0;i<48;i++){const h=Math.floor(i/2);const m=i%2===0?'00':'30';timeOpts+=`<option value="${i}"${i===preS?' selected':''}>${String(h).padStart(2,'0')}:${m}</option>`;}
+  let durOpts='';for(let i=1;i<=32;i++){const m=i*30;durOpts+=`<option value="${i}"${i===1?' selected':''}>${m<60?m+' min':Math.floor(m/60)+'h'+(m%60?' '+m%60+'min':'')}</option>`;}
+
+  showModal(`
+  <div class="modal-head"><div class="modal-title">Schedule meeting</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+  <div class="modal-body"><div class="stack">
+    <div class="field"><label>Title</label><input id="nm-title" placeholder="e.g. Q3 Review"/></div>
+    <div>
+      <div class="section-title">Meeting type</div>
+      <div class="pill-group">
+        <button class="pill active" id="pill-int" onclick="setMType('internal')"><i class="ti ti-door" aria-hidden="true"></i> Internal</button>
+        <button class="pill" id="pill-ext" onclick="setMType('external')"><i class="ti ti-building" aria-hidden="true"></i> External</button>
+      </div>
+    </div>
+    <div id="nm-room-field" class="field"><label>Meeting room</label><select id="nm-room">${roomOpts}</select></div>
+    <div id="nm-loc-field" class="field hidden"><label>Location / address</label><input id="nm-loc" placeholder="e.g. City Hall, Block B"/></div>
+    <div class="r2">
+      <div class="field"><label>Date</label><input type="date" id="nm-date" value="${preD}"/></div>
+      <div class="field"><label>Start time</label><select id="nm-start">${timeOpts}</select></div>
+    </div>
+    <div class="field"><label>Duration (min. 30 min)</label><select id="nm-dur">${durOpts}</select></div>
+    <div>
+      <div class="section-title">Privacy</div>
+      <div class="pill-group">
+        <button class="pill active" id="pill-pub" onclick="setPrivacy('public')"><i class="ti ti-eye" aria-hidden="true"></i> Public</button>
+        <button class="pill" id="pill-priv" onclick="setPrivacy('private')"><i class="ti ti-eye-off" aria-hidden="true"></i> Private</button>
+      </div>
+      <div style="font-size:11px;color:var(--faint);margin-top:5px">Public: title &amp; time visible to all. Private: only visible to participants.</div>
+    </div>
+    <div class="field"><label>Agenda / notes</label><textarea id="nm-notes" placeholder="Optional agenda or description"></textarea></div>
+    <div>
+      <div class="section-title">Participants</div>
+      <div id="nm-participants" class="stack" style="gap:6px"></div>
+      <div class="r2" style="margin-top:8px">
+        <div class="field"><label>Add staff</label><select id="nm-add-staff"><option value="">— select —</option>${DB.staff.filter(s=>s.id!==U.id).map(s=>`<option value="${s.id}">${esc(s.name)} · ${s.sections?esc(s.sections.name):''}</option>`).join('')}</select></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn btn-sm" onclick="addStaffParticipant()"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
+      </div>
+      <div class="section-title" style="margin-top:10px">External guests</div>
+      <div class="r2">
+        <div class="field"><label>Name</label><input id="nm-ext-name" placeholder="Guest name"/></div>
+        <div class="field"><label>Email</label><input type="email" id="nm-ext-email" placeholder="email@example.com"/></div>
+      </div>
+      <button class="btn btn-sm" style="margin-top:6px" onclick="addExtParticipant()"><i class="ti ti-user-plus" aria-hidden="true"></i>Add guest</button>
+    </div>
+    <div id="nm-err" class="alert a-bad hidden"></div>
+  </div></div>
+  <div class="modal-foot">
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-accent" id="nm-save" onclick="saveMeeting()">Schedule</button>
+  </div>`);
+  window._mtype='internal';window._mprivacy='public';window._mparticipants=[];
+  // Add self automatically
+  window._mparticipants=[{staff_id:U.id,name:U.name,email:U.email||'',is_external:false,rsvp:'accepted'}];
+  renderParticipantList();
+}
+
+function setMType(t){
+  window._mtype=t;
+  document.getElementById('pill-int').className='pill'+(t==='internal'?' active':'');
+  document.getElementById('pill-ext').className='pill'+(t==='external'?' active':'');
+  document.getElementById('nm-room-field').classList.toggle('hidden',t!=='internal');
+  document.getElementById('nm-loc-field').classList.toggle('hidden',t!=='external');
+}
+function setPrivacy(p){
+  window._mprivacy=p;
+  document.getElementById('pill-pub').className='pill'+(p==='public'?' active':'');
+  document.getElementById('pill-priv').className='pill'+(p==='private'?' active':'');
+}
+function addStaffParticipant(){
+  const sel=document.getElementById('nm-add-staff');const id=parseInt(sel.value);if(!id)return;
+  if(window._mparticipants.some(p=>p.staff_id===id)){showToast('Already added.');return;}
+  const s=DB.staff.find(x=>x.id===id);if(!s)return;
+  window._mparticipants.push({staff_id:id,name:s.name,email:s.email||'',is_external:false,rsvp:'pending'});
+  sel.value='';renderParticipantList();
+}
+function addExtParticipant(){
+  const name=document.getElementById('nm-ext-name').value.trim();
+  const email=document.getElementById('nm-ext-email').value.trim();
+  if(!name){showToast('Enter guest name.');return;}
+  window._mparticipants.push({staff_id:null,name,email,is_external:true,rsvp:'pending'});
+  document.getElementById('nm-ext-name').value='';document.getElementById('nm-ext-email').value='';
+  renderParticipantList();
+}
+function removeParticipant(idx){window._mparticipants.splice(idx,1);renderParticipantList();}
+function renderParticipantList(){
+  const c=document.getElementById('nm-participants');
+  c.innerHTML=window._mparticipants.map((p,i)=>{
+    const isSelf=p.staff_id===U.id;
+    return`<div class="prow">
+      <div class="prow-avatar" style="background:${p.is_external?'var(--ext-bg)':'var(--accent-bg)'};color:${p.is_external?'var(--ext-ink)':'var(--accent-ink)'}">${initials(p.name)}</div>
+      <div style="flex:1;min-width:0"><div class="prow-name">${esc(p.name)}</div><div class="prow-role">${p.is_external?'External guest':''}</div></div>
+      ${p.rsvp==='accepted'?'<span class="badge b-good">You</span>':''}
+      ${!isSelf?`<button class="prow-rm" onclick="removeParticipant(${i})"><i class="ti ti-x" aria-hidden="true"></i></button>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function saveMeeting(){
+  const title=document.getElementById('nm-title').value.trim();
+  const date=document.getElementById('nm-date').value;
+  const start_slot=parseInt(document.getElementById('nm-start').value);
+  const duration=parseInt(document.getElementById('nm-dur').value);
+  const notes=document.getElementById('nm-notes').value.trim();
+  const err=document.getElementById('nm-err');
+  if(!title){showAlert(err,'Enter a title.');return;}
+  if(!date){showAlert(err,'Pick a date.');return;}
+  const type=window._mtype||'internal';
+  let location='',room_id=null;
+  if(type==='internal'){room_id=parseInt(document.getElementById('nm-room').value);const r=DB.rooms.find(x=>x.id===room_id);location=r?r.name:'';}
+  else{location=document.getElementById('nm-loc').value.trim();}
+  // Conflict check for room
+  if(type==='internal'&&room_id){
+    const existing=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&type=eq.internal`);
+    const conflict=existing.filter(m=>{for(let i=0;i<duration;i++){const s=start_slot+i;if(s>=m.start_slot&&s<m.start_slot+m.duration)return true;}return false;});
+    if(conflict.length){showAlert(err,'This room is already booked for that time. Choose a different room or time.');return;}
+  }
+  const btn=document.getElementById('nm-save');btn.disabled=true;btn.textContent='Saving…';
+  try{
+    const mRows=await POST('meetings',{
+      title,type,privacy:window._mprivacy||'public',date,start_slot,duration,notes,location,
+      room_id:room_id||null,section_id:U.section_id||null,section_name:U.sections?U.sections.name:null,
+      created_by:U.id,created_by_name:U.name,created_by_svc:U.svc_no
+    });
+    const mRow=Array.isArray(mRows)?mRows[0]:mRows;
+    // Insert participants
+    if(window._mparticipants.length){
+      await Promise.all(window._mparticipants.map(p=>POST('participants',{meeting_id:mRow.id,staff_id:p.staff_id||null,name:p.name,email:p.email||null,is_external:p.is_external,rsvp:p.rsvp})));
+    }
+    closeModal();showToast('Meeting scheduled');renderCal();renderMeetingsList();
+  }catch(e){showAlert(err,'Error: '+e.message);btn.disabled=false;btn.textContent='Schedule';}
+}
+
+/* =================== VIEW MEETING MODAL =================== */
+function viewMeetingModal(m){
+  const canSee=canSeeMeetingDetails(m);
+  const sameSection=U.sections&&U.sections.name===m.section_name;
+  const isCreator=m.created_by===U.id;
+  const canEdit=U.role==='admin'||sameSection||isCreator;
+  // Past meetings locked to admin only
+  const today=new Date();today.setHours(0,0,0,0);
+  const mDate=new Date(m.date+'T00:00:00');
+  const isPast=mDate<today;
+  const canEditNow=isPast?(U.role==='admin'):(canEdit);
+  const c=meetingColor(m);
+  const ps=m.participants||[];
+  const myRsvp=ps.find(p=>p.staff_id===U.id);
+
+  showModal(`
+  <div style="height:4px;background:${c.tx}"></div>
+  <div class="modal-head" style="margin-top:10px">
+    <div>
+      <div class="modal-title">${canSee?esc(m.title):'Private meeting'}</div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <span class="tag ${m.type==='external'?'tag-ext':'tag-int'}">${m.type==='internal'?'<i class="ti ti-door" aria-hidden="true"></i> Internal':'<i class="ti ti-building" aria-hidden="true"></i> External'}</span>
+        <span class="tag ${m.privacy==='private'?'tag-priv':'tag-pub'}">${m.privacy==='private'?'<i class="ti ti-eye-off" aria-hidden="true"></i> Private':'<i class="ti ti-eye" aria-hidden="true"></i> Public'}</span>
+      </div>
+    </div>
+    <button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button>
+  </div>
+  <div class="modal-body">
+    <div class="r2" style="margin-bottom:12px">
+      <div><div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Date</div><div class="mono" style="font-weight:700">${new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Time</div><div class="mono" style="font-weight:700">${fTime(m.start_slot)} – ${fTime(m.start_slot+m.duration)}</div></div>
+    </div>
+    ${canSee?`
+    <div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${m.type==='internal'?'Room':'Location'}</div><div style="font-weight:600">${esc(m.location||'—')}</div></div>
+    ${m.notes?`<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Notes</div><div style="color:var(--dim);font-size:12.5px">${esc(m.notes)}</div></div>`:''}
+    <div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Organised by</div><div style="font-weight:600">${esc(m.created_by_name||'—')} <span class="tag" style="background:${getSC(m.section_name).bg};color:${getSC(m.section_name).tx}">${esc(m.section_name||'')}</span></div></div>
+    <div class="hr"></div>
+    <div class="section-title">Participants (${ps.length})</div>
+    <div class="stack" style="gap:5px;max-height:180px;overflow-y:auto">
+    ${ps.map(p=>`<div class="prow">
+      <div class="prow-avatar" style="background:${p.is_external?'var(--ext-bg)':'var(--accent-bg)'};color:${p.is_external?'var(--ext-ink)':'var(--accent-ink)'}">${initials(p.name)}</div>
+      <div style="flex:1;min-width:0"><div class="prow-name">${esc(p.name)}</div>${p.rsvp_note?`<div class="prow-role">${esc(p.rsvp_note)}</div>`:''}</div>
+      <span class="prow-rsvp"><span class="rsvp-dot rsvp-${p.rsvp}"></span>${p.rsvp}</span>
+    </div>`).join('')}
+    </div>`:'<div class="alert a-warn"><i class="ti ti-eye-off" aria-hidden="true"></i>Details are private — only visible to participants.</div>'}
+    ${myRsvp&&myRsvp.rsvp==='pending'?`
+    <div class="hr"></div>
+    <div class="section-title">Your RSVP</div>
+    <div class="r2">
+      <button class="btn btn-good" onclick="rsvp(${m.id},'accepted')"><i class="ti ti-check" aria-hidden="true"></i>Accept</button>
+      <button class="btn btn-danger" onclick="rsvp(${m.id},'declined')"><i class="ti ti-x" aria-hidden="true"></i>Decline</button>
+    </div>
+    <div class="field" style="margin-top:8px"><label>Note (optional)</label><input id="rsvp-note" placeholder="e.g. Will join at 10:30"/></div>`:
+    (myRsvp?`<div class="hr"></div><div class="alert ${myRsvp.rsvp==='accepted'?'a-good':'a-bad'}"><i class="ti ti-${myRsvp.rsvp==='accepted'?'check':'x'}" aria-hidden="true"></i>You responded: <strong>${myRsvp.rsvp}</strong>${myRsvp.rsvp_note?' — '+esc(myRsvp.rsvp_note):''} <button class="btn btn-sm btn-ghost" onclick="rsvpChange(${m.id})" style="margin-left:8px;padding:3px 8px;font-size:11px">Change</button></div>`:'')}
+    ${!canSee?'':`${canEditNow?`<div class="hr"></div><div class="section-title">Email participants</div>
+    <div class="field"><label>Message</label><textarea id="email-body" placeholder="Type your message…" style="min-height:60px"></textarea></div>
+    <button class="btn btn-sm" onclick="sendEmailNotification(${m.id})"><i class="ti ti-mail" aria-hidden="true"></i>Send email to all participants</button>`:''}`}
+    ${isPast&&!U.role==='admin'?'<div class="alert a-warn" style="margin-top:10px"><i class="ti ti-lock" aria-hidden="true"></i>Past meetings can only be edited by admin.</div>':''}
+  </div>
+  <div class="modal-foot">
+    <button class="btn" onclick="closeModal()">Close</button>
+    ${canEditNow?`<button class="btn btn-warn" onclick="openEditMeetingModal(${m.id})"><i class="ti ti-edit" aria-hidden="true"></i>Edit</button>
+    <button class="btn btn-danger" onclick="deleteMeeting(${m.id})"><i class="ti ti-trash" aria-hidden="true"></i>Delete</button>`:''}
+  </div>`);
+}
+
+async function rsvp(meetingId,response){
+  const note=(document.getElementById('rsvp-note')||{}).value||'';
+  const me=DB.staff.find(s=>s.id===U.id);
+  try{
+    // Find participant row
+    const parts=await GET('participants',`select=*&meeting_id=eq.${meetingId}&staff_id=eq.${U.id}`);
+    if(parts.length){
+      await PATCH('participants',`id=eq.${parts[0].id}`,{rsvp:response,rsvp_note:note});
+    } else {
+      await POST('participants',{meeting_id:meetingId,staff_id:U.id,name:U.name,email:U.email||null,is_external:false,rsvp:response,rsvp_note:note});
+    }
+    showToast(response==='accepted'?'You accepted the invite':'You declined the invite');
+    closeModal();renderCal();renderNotifications();
+  }catch(e){alert(e.message);}
+}
+
+function rsvpChange(meetingId){
+  // Reopen the RSVP section
+  const parts=document.querySelectorAll('.prow-rsvp');// just re-render modal
+  // Reload meeting and reshow
+  GET('meetings',`select=*,participants(*)&id=eq.${meetingId}`).then(rows=>{if(rows[0])viewMeetingModal(rows[0]);});
+}
+
+async function openEditMeetingModal(meetingId){
+  const rows=await GET('meetings',`select=*,participants(*)&id=eq.${meetingId}`);
+  if(!rows.length)return;editMeetingModal(rows[0]);
+}
+function editMeetingModal(m){
+  const today=new Date();today.setHours(0,0,0,0);
+  const mDate=new Date(m.date+'T00:00:00');
+  const isPast=mDate<today;
+  if(isPast&&U.role!=='admin'){showToast('Only admin can edit past meetings.');closeModal();return;}
+  const sameSection=U.sections&&U.sections.name===m.section_name;
+  if(!sameSection&&m.created_by!==U.id&&U.role!=='admin'){showToast('Only the organising section can edit this meeting.');closeModal();return;}
+  const roomOpts=DB.rooms.map(r=>`<option value="${r.id}"${r.id===m.room_id?' selected':''}>${esc(r.name)}</option>`).join('');
+  let timeOpts='';for(let i=0;i<48;i++){const h=Math.floor(i/2);const mm=i%2===0?'00':'30';timeOpts+=`<option value="${i}"${i===m.start_slot?' selected':''}>${String(h).padStart(2,'0')}:${mm}</option>`;}
+  let durOpts='';for(let i=1;i<=32;i++){const mn=i*30;durOpts+=`<option value="${i}"${i===m.duration?' selected':''}>${mn<60?mn+' min':Math.floor(mn/60)+'h'+(mn%60?' '+mn%60+'min':'')}</option>`;}
+  const ps=m.participants||[];
+  window._mparticipants=[...ps];
+  showModal(`
+  <div class="modal-head"><div class="modal-title">Edit meeting</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+  <div class="modal-body"><div class="stack">
+    <div class="field"><label>Title</label><input id="em-title" value="${esc(m.title)}"/></div>
+    <div>
+      <div class="section-title">Type</div>
+      <div class="pill-group">
+        <button class="pill${m.type==='internal'?' active':''}" id="pill-int" onclick="setMType('internal')"><i class="ti ti-door" aria-hidden="true"></i> Internal</button>
+        <button class="pill${m.type==='external'?' active':''}" id="pill-ext" onclick="setMType('external')"><i class="ti ti-building" aria-hidden="true"></i> External</button>
+      </div>
+    </div>
+    <div id="nm-room-field" class="${m.type!=='internal'?'field hidden':'field'}"><label>Room</label><select id="nm-room">${roomOpts}</select></div>
+    <div id="nm-loc-field" class="${m.type==='external'?'field':'field hidden'}"><label>Location</label><input id="nm-loc" value="${esc(m.location||'')}"/></div>
+    <div class="r2">
+      <div class="field"><label>Date</label><input type="date" id="em-date" value="${m.date}"/></div>
+      <div class="field"><label>Start</label><select id="nm-start">${timeOpts}</select></div>
+    </div>
+    <div class="field"><label>Duration</label><select id="nm-dur">${durOpts}</select></div>
+    <div>
+      <div class="section-title">Privacy</div>
+      <div class="pill-group">
+        <button class="pill${m.privacy!=='private'?' active':''}" id="pill-pub" onclick="setPrivacy('public')"><i class="ti ti-eye" aria-hidden="true"></i> Public</button>
+        <button class="pill${m.privacy==='private'?' active':''}" id="pill-priv" onclick="setPrivacy('private')"><i class="ti ti-eye-off" aria-hidden="true"></i> Private</button>
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="nm-notes">${esc(m.notes||'')}</textarea></div>
+    <div>
+      <div class="section-title">Participants</div>
+      <div id="nm-participants" class="stack" style="gap:6px"></div>
+      <div class="r2" style="margin-top:8px">
+        <div class="field"><label>Add staff</label><select id="nm-add-staff"><option value="">— select —</option>${DB.staff.map(s=>`<option value="${s.id}">${esc(s.name)} · ${s.sections?esc(s.sections.name):''}</option>`).join('')}</select></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn btn-sm" onclick="addStaffParticipant()"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
+      </div>
+      <div class="r2" style="margin-top:6px">
+        <div class="field"><label>External name</label><input id="nm-ext-name" placeholder="Guest name"/></div>
+        <div class="field"><label>Email</label><input type="email" id="nm-ext-email"/></div>
+      </div>
+      <button class="btn btn-sm" style="margin-top:5px" onclick="addExtParticipant()"><i class="ti ti-user-plus" aria-hidden="true"></i>Add guest</button>
+    </div>
+    <div id="nm-err" class="alert a-bad hidden"></div>
+  </div></div>
+  <div class="modal-foot">
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-accent" id="nm-save" onclick="updateMeeting(${m.id})">Save changes</button>
+  </div>`);
+  window._mtype=m.type;window._mprivacy=m.privacy||'public';
+  renderParticipantList();
+}
+
+async function updateMeeting(meetingId){
+  const title=document.getElementById('em-title').value.trim();
+  const date=document.getElementById('em-date').value;
+  const start_slot=parseInt(document.getElementById('nm-start').value);
+  const duration=parseInt(document.getElementById('nm-dur').value);
+  const notes=document.getElementById('nm-notes').value.trim();
+  const err=document.getElementById('nm-err');
+  if(!title){showAlert(err,'Enter a title.');return;}
+  const type=window._mtype;
+  let location='',room_id=null;
+  if(type==='internal'){room_id=parseInt(document.getElementById('nm-room').value);const r=DB.rooms.find(x=>x.id===room_id);location=r?r.name:'';}
+  else{location=document.getElementById('nm-loc').value.trim();}
+  const btn=document.getElementById('nm-save');btn.disabled=true;btn.textContent='Saving…';
+  try{
+    await PATCH('meetings',`id=eq.${meetingId}`,{title,type,privacy:window._mprivacy,date,start_slot,duration,notes,location,room_id:room_id||null});
+    // Sync participants: delete all then reinsert
+    await DEL('participants',`meeting_id=eq.${meetingId}`);
+    if(window._mparticipants.length){
+      await Promise.all(window._mparticipants.map(p=>POST('participants',{meeting_id:meetingId,staff_id:p.staff_id||null,name:p.name,email:p.email||null,is_external:p.is_external||false,rsvp:p.rsvp||'pending'})));
+    }
+    closeModal();showToast('Meeting updated');renderCal();renderMeetingsList();
+  }catch(e){showAlert(err,'Error: '+e.message);btn.disabled=false;btn.textContent='Save changes';}
+}
+
+async function deleteMeeting(id){
+  if(!confirm('Delete this meeting? This cannot be undone.'))return;
+  try{await DEL('meetings',`id=eq.${id}`);closeModal();showToast('Meeting deleted');renderCal();renderMeetingsList();}
+  catch(e){alert(e.message);}
+}
+
+/* =================== EMAIL NOTIFICATION =================== */
+async function sendEmailNotification(meetingId){
+  const body=document.getElementById('email-body').value.trim();
+  if(!body){showToast('Enter a message.');return;}
+  // Gather participants with emails
+  const parts=await GET('participants',`select=*&meeting_id=eq.${meetingId}`);
+  const withEmail=parts.filter(p=>p.email);
+  if(!withEmail.length){showToast('No participants have email addresses.');return;}
+  // Build mailto links for each (since we have no server-side email sending, open mailto)
+  const emails=withEmail.map(p=>p.email).join(',');
+  const meeting=await GET('meetings',`select=title,date&id=eq.${meetingId}`);
+  const m=meeting[0]||{};
+  const subject=`Meeting Invitation: ${m.title||''}`;
+  const mailtoLink=`mailto:${encodeURIComponent(emails)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // Log notification
+  try{
+    await Promise.all(withEmail.map(p=>POST('notifications',{meeting_id:meetingId,participant_id:p.id,subject,body,status:'sent'})));
+  }catch(e_){}
+  window.open(mailtoLink,'_blank');
+  showToast(`Email opened for ${withEmail.length} participant(s)`);
+}
+
+/* =================== MEETINGS LIST =================== */
+async function renderMeetingsList(){
+  const all=await loadAllMeetings();
+  const myMeetings=all.filter(m=>{
+    if(m.created_by===U.id)return true;
+    return m.participants&&m.participants.some(p=>p.staff_id===U.id);
+  });
+  allMeetingsCache=myMeetings;
+  filterMeetings(meetingFilter,null);
+}
+function filterMeetings(filter,btn){
+  meetingFilter=filter;
+  document.querySelectorAll('.pill[data-filter]').forEach(p=>p.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const today=new Date();today.setHours(0,0,0,0);
+  let list=[...allMeetingsCache];
+  if(filter==='internal')list=list.filter(m=>m.type==='internal');
+  else if(filter==='external')list=list.filter(m=>m.type==='external');
+  else if(filter==='upcoming')list=list.filter(m=>new Date(m.date+'T00:00:00')>=today);
+  else if(filter==='past')list=list.filter(m=>new Date(m.date+'T00:00:00')<today);
+  list.sort((a,b)=>a.date===b.date?a.start_slot-b.start_slot:a.date<b.date?1:-1);
+  const container=document.getElementById('meetings-list');
+  if(!list.length){container.innerHTML='<div class="alert a-info"><i class="ti ti-calendar-off" aria-hidden="true"></i>No meetings found.</div>';return;}
+  container.innerHTML=list.map(m=>{
+    const c=meetingColor(m);const canSee=canSeeMeetingDetails(m);
+    const myP=(m.participants||[]).find(p=>p.staff_id===U.id);
+    const rsvpDot=myP?`<span class="rsvp-dot rsvp-${myP.rsvp}" style="display:inline-block"></span>`:'';
+    return`<div class="mcard" onclick="viewMeetingAndLoad(${m.id})">
+      <div class="mcard-bar" style="background:${c.tx}"></div>
+      <div class="mcard-body">
+        <div class="mcard-header">
+          <div class="mcard-title">${canSee?esc(m.title):'Private meeting'}</div>
+          <span class="tag ${m.type==='external'?'tag-ext':'tag-int'}">${m.type==='internal'?'Internal':'External'}</span>
+        </div>
+        <div class="mcard-meta">
+          <span><i class="ti ti-calendar" aria-hidden="true"></i>${new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</span>
+          <span class="mono"><i class="ti ti-clock" aria-hidden="true"></i>${fTime(m.start_slot)} – ${fTime(m.start_slot+m.duration)}</span>
+          ${canSee&&m.location?`<span><i class="ti ti-${m.type==='external'?'building':'door'}" aria-hidden="true"></i>${esc(m.location)}</span>`:''}
+          ${rsvpDot}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function viewMeetingAndLoad(id){
+  const rows=await GET('meetings',`select=*,participants(*)&id=eq.${id}`);
+  if(rows[0])viewMeetingModal(rows[0]);
+}
+
+/* =================== NOTIFICATIONS =================== */
+async function renderNotifications(){
+  const parts=await GET('participants',`select=*,meetings(*)&staff_id=eq.${U.id}&rsvp=eq.pending`);
+  const container=document.getElementById('notif-list');
+  if(!parts.length){container.innerHTML='<div class="alert a-good"><i class="ti ti-check" aria-hidden="true"></i>All caught up! No pending invitations.</div>';return;}
+  container.innerHTML=parts.map(p=>{
+    const m=p.meetings;if(!m)return'';
+    const c=meetingColor(m);
+    return`<div class="panel" style="overflow:visible">
+      <div class="panel-head">
+        <div class="panel-title"><i class="ti ti-calendar-event" aria-hidden="true"></i>${esc(m.title)}</div>
+        <span class="badge b-warn">Pending</span>
+      </div>
+      <div style="padding:12px 16px">
+        <div class="mcard-meta" style="margin-bottom:12px">
+          <span><i class="ti ti-calendar" aria-hidden="true"></i>${new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</span>
+          <span class="mono"><i class="ti ti-clock" aria-hidden="true"></i>${fTime(m.start_slot)} – ${fTime(m.start_slot+m.duration)}</span>
+          <span><i class="ti ti-${m.type==='external'?'building':'door'}" aria-hidden="true"></i>${esc(m.location||'')}</span>
+        </div>
+        <div class="field" style="margin-bottom:8px"><label>Your note (optional)</label><input id="rsvp-note-${p.id}" placeholder="e.g. Will join at 10:30"/></div>
+        <div class="r2">
+          <button class="btn btn-good" onclick="rsvpFromNotif(${m.id},${p.id},'accepted')"><i class="ti ti-check" aria-hidden="true"></i>Accept</button>
+          <button class="btn btn-danger" onclick="rsvpFromNotif(${m.id},${p.id},'declined')"><i class="ti ti-x" aria-hidden="true"></i>Decline</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function rsvpFromNotif(meetingId,partId,response){
+  const noteEl=document.getElementById('rsvp-note-'+partId);
+  const note=noteEl?noteEl.value.trim():'';
+  try{
+    await PATCH('participants',`id=eq.${partId}`,{rsvp:response,rsvp_note:note});
+    showToast(response==='accepted'?'Accepted':'Declined');
+    renderNotifications();renderCal();
+  }catch(e){alert(e.message);}
+}
+
+/* =================== ADMIN =================== */
+async function renderAdmin(){
+  await loadAll();
+  document.getElementById('sec-tbody').innerHTML=DB.sections.map(s=>{
+    const c=getSC(s.name);
+    return`<tr><td><span class="tag" style="background:${c.bg};color:${c.tx}">${esc(s.name)}</span></td>
+    <td><button class="btn btn-danger btn-icon" onclick="delSection(${s.id},'${esc(s.name)}')"><i class="ti ti-trash" aria-hidden="true"></i></button></td></tr>`;
+  }).join('')||'<tr><td colspan="2" style="color:var(--faint);text-align:center;padding:12px">No sections</td></tr>';
+
+  document.getElementById('rooms-tbody').innerHTML=DB.rooms.map(r=>`<tr>
+    <td style="font-weight:600">${esc(r.name)}</td><td class="mono">${r.capacity||'—'}</td><td class="mono" style="color:var(--dim)">${r.end_hour}:00</td>
+    <td><div class="acts">
+      <button class="btn btn-warn btn-icon" onclick="openModal('edit-room',${r.id})"><i class="ti ti-edit" aria-hidden="true"></i></button>
+      <button class="btn btn-danger btn-icon" onclick="delRoom(${r.id})"><i class="ti ti-trash" aria-hidden="true"></i></button>
+    </div></td></tr>`).join('')||'<tr><td colspan="4" style="color:var(--faint);text-align:center;padding:12px">No rooms</td></tr>';
+
+  document.getElementById('staff-tbody').innerHTML=DB.staff.filter(s=>s.svc_no!=='SVC000').map(s=>{
+    const c=getSC(s.sections?s.sections.name:null);
+    return`<tr>
+      <td class="mono">${s.svc_no}</td>
+      <td style="font-weight:600">${esc(s.name)}</td>
+      <td style="color:var(--dim);font-size:12px">${esc(s.email||'—')}</td>
+      <td><span class="tag" style="background:${c.bg};color:${c.tx}">${s.sections?esc(s.sections.name):'—'}</span></td>
+      <td>${s.role==='admin'?'<span class="badge b-accent">Admin</span>':'<span class="badge b-muted">Staff</span>'}</td>
+      <td>${s.active?'<span class="badge b-good">Active</span>':'<span class="badge b-bad">Inactive</span>'}</td>
+      <td><div class="acts">
+        <button class="btn btn-sm" onclick="openModal('edit-staff','${s.svc_no}')"><i class="ti ti-edit" aria-hidden="true"></i></button>
+        <button class="btn btn-sm" onclick="openModal('reset-pwd','${s.svc_no}')"><i class="ti ti-lock" aria-hidden="true"></i></button>
+        <button class="btn btn-sm ${s.active?'btn-warn':'btn-accent'}" onclick="toggleStaff(${s.id},${s.active})">${s.active?'Deactivate':'Activate'}</button>
+      </div></td></tr>`;
+  }).join('')||'<tr><td colspan="7" style="color:var(--faint);text-align:center;padding:12px">No staff</td></tr>';
+}
+async function delSection(id,name){if(!confirm(`Remove "${name}"?`))return;try{await DEL('sections','id=eq.'+id);await loadAll();renderAdmin();showToast('Removed');}catch(e){alert(e.message);}}
+async function delRoom(id){if(!confirm('Remove this room?'))return;try{await DEL('rooms','id=eq.'+id);await loadAll();renderAdmin();showToast('Removed');}catch(e){alert(e.message);}}
+async function toggleStaff(id,active){try{await PATCH('staff','id=eq.'+id,{active:!active});await loadAll();renderAdmin();showToast('Updated');}catch(e){alert(e.message);}}
+
+/* =================== ADMIN MODALS =================== */
+function openModal(type,id){
+  if(type==='add-section'){
+    showModal(`<div class="modal-head"><div class="modal-title">Add section</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+      <div class="modal-body"><div class="stack"><div class="field"><label>Name</label><input id="m-s" placeholder="e.g. Legal"/></div></div></div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveSection()">Add</button></div>`);
+  } else if(type==='add-room'){
+    showModal(`<div class="modal-head"><div class="modal-title">Add room</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+      <div class="modal-body"><div class="stack">
+        <div class="field"><label>Name</label><input id="m-rn" placeholder="e.g. Board Room"/></div>
+        <div class="r2"><div class="field"><label>Capacity</label><input type="number" id="m-rc" placeholder="10"/></div>
+        <div class="field"><label>Available until</label><select id="m-re">${endOpts(20)}</select></div></div>
+      </div></div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveRoom()">Add</button></div>`);
+  } else if(type==='edit-room'){
+    const r=DB.rooms.find(x=>x.id===id);
+    showModal(`<div class="modal-head"><div class="modal-title">Edit room</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+      <div class="modal-body"><div class="stack">
+        <div class="field"><label>Name</label><input id="m-rn" value="${esc(r.name)}"/></div>
+        <div class="r2"><div class="field"><label>Capacity</label><input type="number" id="m-rc" value="${r.capacity||''}"/></div>
+        <div class="field"><label>Until</label><select id="m-re">${endOpts(r.end_hour)}</select></div></div>
+      </div></div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveRoom(${id})">Save</button></div>`);
+  } else if(type==='add-staff'){
+    showModal(`<div class="modal-head"><div class="modal-title">Add staff</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+      <div class="modal-body"><div class="stack">
+        <div class="r2"><div class="field"><label>Service number</label><input id="m-sv" placeholder="10001"/></div><div class="field"><label>Temp password</label><input type="text" id="m-pw" placeholder="min 8 chars + number"/></div></div>
+        <div style="font-size:11px;color:var(--faint)">Min 8 chars, one letter and one number. Staff will set their own on first login.</div>
+        <div class="field"><label>Full name</label><input id="m-fn"/></div>
+        <div class="field"><label>Email</label><input type="email" id="m-em"/></div>
+        <div class="field"><label>Section</label><select id="m-ss">${DB.sections.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
+        <label class="toggle-row"><input type="checkbox" id="m-admin"/><span>Grant admin access</span></label>
+      </div></div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveStaff()">Create</button></div>`);
+  } else if(type==='edit-staff'){
+    const s=DB.staff.find(x=>x.svc_no===id);
+    showModal(`<div class="modal-head"><div class="modal-title">Edit staff</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+      <div class="modal-body"><div class="stack">
+        <div class="field"><label>Service no.</label><input readonly value="${s.svc_no}"/></div>
+        <div class="field"><label>Full name</label><input id="m-fn" value="${esc(s.name)}"/></div>
+        <div class="field"><label>Email</label><input type="email" id="m-em" value="${esc(s.email||'')}"/></div>
+        <div class="field"><label>Section</label><select id="m-ss">${DB.sections.map(sec=>`<option value="${sec.id}"${sec.id===s.section_id?' selected':''}>${esc(sec.name)}</option>`).join('')}</select></div>
+        <label class="toggle-row"><input type="checkbox" id="m-admin"${s.role==='admin'?' checked':''}/><span>Admin access</span></label>
+      </div></div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="updateStaff('${s.svc_no}')">Save</button></div>`);
+  } else if(type==='reset-pwd'){
+    const s=DB.staff.find(x=>x.svc_no===id);
+    showModal(`<div class="modal-head"><div class="modal-title">Reset password</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+      <div class="modal-body"><div class="stack">
+        <div class="alert a-warn"><i class="ti ti-user" aria-hidden="true"></i>Resetting for <strong>${esc(s.name)}</strong>. They'll be forced to set a new one on next login.</div>
+        <div class="field"><label>Temp password</label><input type="text" id="m-np" placeholder="min 8 chars + number"/></div>
+      </div></div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="resetPwd('${s.svc_no}')">Reset</button></div>`);
+  }
+}
+function endOpts(sel){return Array.from({length:13},(_,i)=>i+8).map(h=>`<option value="${h}"${h===sel?' selected':''}>${h}:00</option>`).join('');}
+async function saveSection(){const name=document.getElementById('m-s').value.trim();if(!name)return;try{await POST('sections',{name});await loadAll();closeModal();renderAdmin();showToast('Section added');}catch(e){alert(e.message);}}
+async function saveRoom(id){
+  const name=document.getElementById('m-rn').value.trim();
+  const capacity=parseInt(document.getElementById('m-rc').value)||0;
+  const end_hour=parseInt(document.getElementById('m-re').value);
+  if(!name)return;
+  try{
+    if(id)await PATCH('rooms','id=eq.'+id,{name,capacity,end_hour});else await POST('rooms',{name,capacity,end_hour});
+    await loadAll();closeModal();renderAdmin();showToast(id?'Room updated':'Room added');
+  }catch(e){alert(e.message);}
+}
+async function saveStaff(){
+  const svc_no=document.getElementById('m-sv').value.trim().toUpperCase();
+  const password=document.getElementById('m-pw').value.trim();
+  const name=document.getElementById('m-fn').value.trim();
+  const email=document.getElementById('m-em').value.trim();
+  const section_id=parseInt(document.getElementById('m-ss').value);
+  const role=document.getElementById('m-admin').checked?'admin':'staff';
+  if(!svc_no||!password||!name){alert('Fill all required fields.');return;}
+  const issue=pwdIssue(password);if(issue){alert(issue);return;}
+  try{await POST('staff',{svc_no,name,email,section_id,password,role,active:true,must_reset_password:true});await loadAll();closeModal();renderAdmin();showToast('Staff created — they\'ll set their own password on first login');}catch(e){alert(e.message);}
+}
+async function updateStaff(svc_no){
+  const name=document.getElementById('m-fn').value.trim();
+  const email=document.getElementById('m-em').value.trim();
+  const section_id=parseInt(document.getElementById('m-ss').value);
+  const role=document.getElementById('m-admin').checked?'admin':'staff';
+  try{await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc_no),{name,email,section_id,role});await loadAll();closeModal();renderAdmin();showToast('Staff updated');}catch(e){alert(e.message);}
+}
+async function resetPwd(svc_no){
+  const pwd=document.getElementById('m-np').value.trim();
+  const issue=pwdIssue(pwd);if(issue){alert(issue);return;}
+  try{await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc_no),{password:pwd,must_reset_password:true});closeModal();showToast('Password reset — they\'ll be prompted on next login');}catch(e){alert(e.message);}
+}
+
+/* =================== HELPERS =================== */
+function showModal(html){document.getElementById('modal-root').innerHTML=`<div class="overlay" onclick="handleOvClick(event)"><div class="modal">${html}</div></div>`;}
+function closeModal(){document.getElementById('modal-root').innerHTML='';}
+function handleOvClick(e){if(e.target.classList.contains('overlay'))closeModal();}
+function showAlert(el,msg){el.textContent=msg;el.classList.remove('hidden');}
+let _tt;function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2600);}
+let _rt;window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(U&&!document.getElementById('tab-calendar').classList.contains('hidden'))renderCal();},200);});
+
+/* =================== INIT =================== */
+(function(){
+  const cfg=loadCfg();
+  if(cfg){initSB(cfg.u,cfg.k);showPage('login');}
+  else showPage('config');
+})();
+</script>
+</body>
+</html>
