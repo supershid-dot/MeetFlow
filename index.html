@@ -278,6 +278,26 @@ tbody tr:hover td{background:var(--panel2)}
 .chk-list label{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;padding:4px 6px;border-radius:6px;cursor:pointer}
 .chk-list label:hover{background:var(--panel2)}
 .chk-list input{width:14px;height:14px;accent-color:var(--accent)}
+
+/* SIDEBAR */
+.tabs-desktop{display:none!important}
+.layout{display:flex;min-height:calc(100vh - 52px)}
+.sidebar{display:none;width:226px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--line);position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;flex-direction:column}
+@media(min-width:900px){.sidebar{display:flex}}
+.sb-nav{flex:1;padding:10px 8px}
+.sb-item{display:flex;align-items:center;gap:11px;padding:9px 13px;border-radius:9px;color:var(--dim);font-size:13px;font-weight:600;border:none;background:none;width:100%;cursor:pointer;transition:all var(--ease);text-align:left}
+.sb-item:hover{background:var(--panel2);color:var(--ink)}
+.sb-item.active{background:var(--accent-bg);color:var(--accent-ink)}
+.sb-item .ti{font-size:16px;flex-shrink:0}
+.sb-footer{padding:8px 8px 14px;border-top:1px solid var(--line)}
+.sb-user{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:9px;background:var(--panel2);margin-bottom:6px}
+.sb-user-info{flex:1;min-width:0}
+.sb-user-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.sb-footer-btn{display:flex;align-items:center;gap:9px;padding:8px 13px;border-radius:9px;color:var(--dim);font-size:12.5px;font-weight:600;border:none;background:none;width:100%;cursor:pointer;transition:all var(--ease);text-align:left}
+.sb-footer-btn:hover{background:var(--panel2);color:var(--ink)}
+.sb-footer-btn .ti{font-size:15px;flex-shrink:0}
+@media(min-width:900px){.main{max-width:none;margin:0;width:100%}}
 </style>
 </head>
 <body>
@@ -358,8 +378,13 @@ tbody tr:hover td{background:var(--panel2)}
     <button class="icon-btn" onclick="doLogout()" title="Sign out"><i class="ti ti-logout" aria-hidden="true"></i></button>
   </header>
 
+  <div class="layout">
+  <nav class="sidebar" id="sidebar">
+    <div class="sb-nav" id="sb-nav"></div>
+    <div class="sb-footer" id="sb-footer"></div>
+  </nav>
   <main class="main">
-    <div class="tabs-desktop" id="tabs-d"></div>
+    <div class="tabs-desktop" id="tabs-d" style="display:none"></div>
 
     <!-- CALENDAR TAB (meeting schedule) -->
     <div id="tab-calendar">
@@ -423,14 +448,24 @@ tbody tr:hover td{background:var(--panel2)}
     <!-- ADMIN TAB -->
     <div id="tab-admin" class="hidden">
       <div class="ph"><div class="ph-eyebrow">Admin</div><div class="ph-title">Manage</div><div class="ph-sub">Staff, sections, rooms and groups</div></div>
-      <div class="panel" style="margin-bottom:14px" id="cal-hours-panel">
-        <div class="panel-head"><div class="panel-title"><i class="ti ti-clock" aria-hidden="true"></i>Calendar Display Hours</div></div>
-        <div style="padding:12px 16px">
-          <div class="r2" style="margin-bottom:10px">
-            <div class="field"><label>Show from</label><select id="cal-start-sel"></select></div>
-            <div class="field"><label>Show until</label><select id="cal-end-sel"></select></div>
+      <div class="adgrid" style="margin-bottom:14px">
+        <div class="panel" id="cal-hours-panel">
+          <div class="panel-head"><div class="panel-title"><i class="ti ti-clock" aria-hidden="true"></i>Calendar Hours</div></div>
+          <div style="padding:12px 16px">
+            <div class="r2" style="margin-bottom:10px">
+              <div class="field"><label>Show from</label><select id="cal-start-sel"></select></div>
+              <div class="field"><label>Show until</label><select id="cal-end-sel"></select></div>
+            </div>
+            <button class="btn btn-accent btn-sm" onclick="saveCalHours()"><i class="ti ti-check" aria-hidden="true"></i>Save hours</button>
           </div>
-          <button class="btn btn-accent btn-sm" onclick="saveCalHours()"><i class="ti ti-check" aria-hidden="true"></i>Save hours</button>
+        </div>
+        <div class="panel" id="tg-panel">
+          <div class="panel-head"><div class="panel-title"><i class="ti ti-brand-telegram" aria-hidden="true"></i>Telegram Notifications</div></div>
+          <div style="padding:12px 16px">
+            <div class="alert a-info" style="margin-bottom:10px;font-size:11px"><i class="ti ti-info-circle" aria-hidden="true"></i><span>Create a bot via <strong>@BotFather</strong>, paste the token below. Add each staff member's Chat ID in their profile (they can get it from @userinfobot).</span></div>
+            <div class="field" style="margin-bottom:10px"><label>Bot Token</label><input id="tg-token-input" type="password" placeholder="123456:ABCdef…" autocomplete="off"/></div>
+            <button class="btn btn-accent btn-sm" onclick="saveTgToken()"><i class="ti ti-check" aria-hidden="true"></i>Save token</button>
+          </div>
         </div>
       </div>
       <div class="adgrid">
@@ -449,10 +484,11 @@ tbody tr:hover td{background:var(--panel2)}
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title"><i class="ti ti-users" aria-hidden="true"></i>Staff</div><button class="btn btn-accent btn-sm" onclick="openModal('add-staff')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
-        <div class="tbl-wrap"><table><thead><tr><th>Svc no.</th><th>Name</th><th>Email</th><th>Section</th><th>Role</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead><tbody id="staff-tbody"></tbody></table></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Svc no.</th><th>Name</th><th>Email</th><th>Section</th><th>Role</th><th>Access</th><th>Telegram</th><th>Status</th><th>Actions</th></tr></thead><tbody id="staff-tbody"></tbody></table></div>
       </div>
     </div>
   </main>
+  </div><!-- /.layout -->
 
   <nav class="tabbar" id="tabbar"></nav>
 </div>
@@ -465,7 +501,7 @@ tbody tr:hover td{background:var(--panel2)}
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);
   const ic=t==='dark'?'ti-sun':'ti-moon';
-  ['theme-icon','theme-icon-login'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ti '+ic;});
+  ['theme-icon','theme-icon-login','theme-icon-sb'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ti '+ic;});
   localStorage.setItem('theme',t);
 }
 function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');}
@@ -638,17 +674,32 @@ function buildNav(){
     {id:'notif',icon:'ti-bell',label:'Inbox'},
     ...(isAdmin?[{id:'admin',icon:'ti-adjustments',label:'Admin'}]:[])
   ];
+  // Mobile bottom tabbar
   const tb=document.getElementById('tabbar');tb.innerHTML='';
   tabs.forEach(t=>{
     const b=document.createElement('button');b.className='tbb'+(t.id==='calendar'?' active':'');b.dataset.tab=t.id;
     b.innerHTML=`<i class="ti ${t.icon}" aria-hidden="true"></i><span>${t.label}</span>`;
     b.onclick=()=>switchTab(t.id);tb.appendChild(b);
   });
-  const td=document.getElementById('tabs-d');td.innerHTML='';
+  // Desktop sidebar nav
+  const sbnav=document.getElementById('sb-nav');sbnav.innerHTML='';
   tabs.forEach(t=>{
-    const b=document.createElement('button');b.className='tab-btn'+(t.id==='calendar'?' active':'');b.dataset.tab=t.id;
-    b.textContent=t.label;b.onclick=()=>switchTab(t.id);td.appendChild(b);
+    const b=document.createElement('button');b.className='sb-item'+(t.id==='calendar'?' active':'');b.dataset.tab=t.id;
+    b.innerHTML=`<i class="ti ${t.icon}" aria-hidden="true"></i><span>${t.label}</span>`;
+    b.onclick=()=>switchTab(t.id);sbnav.appendChild(b);
   });
+  // Sidebar footer: user info + actions
+  const sbfoot=document.getElementById('sb-footer');
+  const roleLabel=(U.sections?U.sections.name:(U.role==='admin'?'admin':'')).toLowerCase();
+  sbfoot.innerHTML=`<div class="sb-user">
+    <div class="avatar" style="width:30px;height:30px;font-size:11px">${initials(U.name)}</div>
+    <div class="sb-user-info"><div class="sb-user-name">${esc(U.name)}</div><div class="sb-user-role">${esc(roleLabel)}</div></div>
+  </div>
+  <button class="sb-footer-btn" onclick="toggleTheme()"><i class="ti ti-moon" id="theme-icon-sb" aria-hidden="true"></i>Toggle theme</button>
+  <button class="sb-footer-btn" onclick="doLogout()"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</button>`;
+  // Sync theme icon
+  const t=document.documentElement.getAttribute('data-theme');
+  const sbic=document.getElementById('theme-icon-sb');if(sbic)sbic.className='ti '+(t==='dark'?'ti-sun':'ti-moon');
   buildStaffSelect();
   buildRoomSelect();
 }
@@ -656,7 +707,7 @@ function switchTab(id){
   ['calendar','rooms','meetings','notif','admin'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.add('hidden');});
   document.getElementById('tab-'+id).classList.remove('hidden');
   document.querySelectorAll('.tbb[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));
-  document.querySelectorAll('.tab-btn[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));
+  document.querySelectorAll('.sb-item[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));
   if(id==='calendar'){renderCal();}
   else if(id==='rooms'){renderRooms();}
   else if(id==='meetings'){renderMeetingsList();}
@@ -1367,29 +1418,75 @@ async function confirmCancel(meetingId){
   }catch(e){showAlert(document.getElementById('cx-err'),'Error: '+e.message);btn.disabled=false;btn.textContent='Cancel meeting';}
 }
 
-/* =================== NOTIFY / EMAIL =================== */
+/* =================== TELEGRAM =================== */
+function loadTgToken(){return localStorage.getItem('mf_tg_token')||'';}
+function saveTgToken(){
+  const tok=document.getElementById('tg-token-input').value.trim();
+  localStorage.setItem('mf_tg_token',tok);
+  showToast(tok?'Telegram token saved':'Telegram token cleared');
+}
+function initTgPanel(){
+  const el=document.getElementById('tg-token-input');
+  if(el)el.value=loadTgToken();
+}
+async function sendTg(token,chatId,text){
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId,text,parse_mode:'HTML'})
+    });
+    const d=await r.json();return d.ok;
+  }catch(e){return false;}
+}
+
+/* =================== NOTIFY =================== */
 async function sendMeetingComm(meetingId,type,extra,silent,skipLog){
   let bodyExtra=extra;
   if(type==='message'&&!silent){const el=document.getElementById('email-body');bodyExtra=el?el.value.trim():'';if(!bodyExtra){showToast('Enter a message.');return;}}
   const parts=await GET('participants',`select=*&meeting_id=eq.${meetingId}`);
-  const withEmail=parts.filter(p=>p.email);
   const mrows=await GET('meetings',`select=*&id=eq.${meetingId}`);const m=mrows[0]||{};
   const when=`${new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})} ${fTime(m.start_slot)}–${fTime(m.start_slot+m.duration)}`;
-  const where=m.meeting_link?`Link: ${m.meeting_link}`:(m.location||'');
-  let subject,intro;
-  if(type==='reminder'){subject=`Reminder: ${m.title}`;intro=`This is a reminder for "${m.title}".`;}
-  else if(type==='update'){subject=`Updated: ${m.title}`;intro=`The meeting "${m.title}" has been updated.`;}
-  else if(type==='cancellation'){subject=`Cancelled: ${m.title}`;intro=`The meeting "${m.title}" has been cancelled.`;}
-  else{subject=`Regarding: ${m.title}`;intro=`Regarding the meeting "${m.title}".`;}
-  const body=`${intro}\n\nWhen: ${when}\n${where?where+'\n':''}${bodyExtra?'\n'+bodyExtra+'\n':''}\n— ${U.name}`;
-  if(!skipLog){
-    try{await Promise.all(withEmail.map(p=>POST('notifications',{meeting_id:meetingId,participant_id:p.id,type:(type==='message'?'invitation':type),subject,body,status:'sent'})));}catch(e){}
+  const where=m.meeting_link?`${m.meeting_link}`:(m.location||'');
+  let subject,intro,tgIcon;
+  if(type==='reminder'){subject=`Reminder: ${m.title}`;intro=`This is a reminder for "${m.title}".`;tgIcon='🔔';}
+  else if(type==='update'){subject=`Updated: ${m.title}`;intro=`The meeting "${m.title}" has been updated.`;tgIcon='✏️';}
+  else if(type==='cancellation'){subject=`Cancelled: ${m.title}`;intro=`The meeting "${m.title}" has been cancelled.`;tgIcon='❌';}
+  else{subject=`Regarding: ${m.title}`;intro=`Regarding the meeting "${m.title}".`;tgIcon='📅';}
+  const emailBody=`${intro}\n\nWhen: ${when}\n${where?'Location/Link: '+where+'\n':''}${bodyExtra?'\n'+bodyExtra+'\n':''}\n— ${U.name}`;
+
+  const tgToken=loadTgToken();
+  const emailFallback=[];
+  let tgSent=0;
+
+  for(const p of parts){
+    const staffRow=p.staff_id?DB.staff.find(s=>s.id===p.staff_id):null;
+    const chatId=staffRow?.telegram_chat_id;
+    if(tgToken&&chatId){
+      const tgText=`${tgIcon} <b>${subject}</b>\n\n${intro}\n\n📅 <b>When:</b> ${when}${where?'\n📍 <b>Where:</b> '+where:''}${bodyExtra?'\n\n'+bodyExtra:''}\n\n— ${U.name}`;
+      const ok=await sendTg(tgToken,chatId,tgText);
+      if(ok){tgSent++;continue;}
+    }
+    if(p.email)emailFallback.push(p);
   }
-  if(withEmail.length){
-    const emails=withEmail.map(p=>p.email).join(',');
-    window.open(`mailto:${encodeURIComponent(emails)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,'_blank');
-    showToast(`Email opened for ${withEmail.length} attendee(s)`);
-  }else if(!silent){showToast('No attendees have email addresses.');}
+
+  if(!skipLog){
+    const logParts=parts.filter(p=>p.email);
+    try{await Promise.all(logParts.map(p=>POST('notifications',{meeting_id:meetingId,participant_id:p.id,type:(type==='message'?'invitation':type),subject,body:emailBody,status:'sent'})));}catch(e){}
+  }
+
+  if(emailFallback.length){
+    const emails=emailFallback.map(p=>p.email).join(',');
+    window.open(`mailto:${encodeURIComponent(emails)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`,'_blank');
+  }
+
+  if(!silent){
+    const info=[];
+    if(tgSent>0)info.push(`${tgSent} via Telegram`);
+    if(emailFallback.length>0)info.push(`${emailFallback.length} via email`);
+    if(info.length)showToast('Sent: '+info.join(', '));
+    else if(!tgToken&&!emailFallback.length)showToast('Set up Telegram in Admin to send notifications');
+    else showToast('No recipients have Telegram or email');
+  }
 }
 
 /* =================== MEETINGS LIST =================== */
@@ -1493,7 +1590,7 @@ async function rsvpFromNotif(meetingId,partId,response){
 
 /* =================== ADMIN =================== */
 async function renderAdmin(){
-  await loadAll();buildStaffSelect();buildRoomSelect();buildHourSelects();
+  await loadAll();buildStaffSelect();buildRoomSelect();buildHourSelects();initTgPanel();
   document.getElementById('sec-tbody').innerHTML=DB.sections.map(s=>{
     const c=getSC(s.name);
     return`<tr><td><span class="tag" style="background:${c.bg};color:${c.tx}">${esc(s.name)}</span></td>
@@ -1520,6 +1617,7 @@ async function renderAdmin(){
   document.getElementById('staff-tbody').innerHTML=DB.staff.filter(s=>s.svc_no!=='SVC000').map(s=>{
     const c=getSC(s.sections?s.sections.name:null);
     const access=[s.can_view_all?'<span class="badge b-accent" title="Can view all schedules">All cal</span>':'',s.can_create_groups?'<span class="badge b-accent" title="Can create group meetings">Groups</span>':''].filter(Boolean).join(' ')||'<span style="color:var(--faint)">—</span>';
+    const tgBadge=s.telegram_chat_id?'<span class="badge b-good" title="Telegram linked"><i class="ti ti-brand-telegram"></i> Linked</span>':'<span style="color:var(--faint);font-size:11px">—</span>';
     return`<tr>
       <td class="mono">${s.svc_no}</td>
       <td style="font-weight:600">${esc(s.name)}</td>
@@ -1527,13 +1625,14 @@ async function renderAdmin(){
       <td><span class="tag" style="background:${c.bg};color:${c.tx}">${s.sections?esc(s.sections.name):'—'}</span></td>
       <td>${s.role==='admin'?'<span class="badge b-accent">Admin</span>':'<span class="badge b-muted">Staff</span>'}</td>
       <td>${access}</td>
+      <td>${tgBadge}</td>
       <td>${s.active?'<span class="badge b-good">Active</span>':'<span class="badge b-bad">Inactive</span>'}</td>
       <td><div class="acts">
         <button class="btn btn-sm" onclick="openModal('edit-staff','${s.svc_no}')"><i class="ti ti-edit" aria-hidden="true"></i></button>
         <button class="btn btn-sm" onclick="openModal('reset-pwd','${s.svc_no}')"><i class="ti ti-lock" aria-hidden="true"></i></button>
         <button class="btn btn-sm ${s.active?'btn-warn':'btn-accent'}" onclick="toggleStaff(${s.id},${s.active})">${s.active?'Deactivate':'Activate'}</button>
       </div></td></tr>`;
-  }).join('')||'<tr><td colspan="8" style="color:var(--faint);text-align:center;padding:12px">No staff</td></tr>';
+  }).join('')||'<tr><td colspan="9" style="color:var(--faint);text-align:center;padding:12px">No staff</td></tr>';
 }
 async function delSection(id,name){if(!confirm(`Remove "${name}"?`))return;try{await DEL('sections','id=eq.'+id);await loadAll();renderAdmin();showToast('Removed');}catch(e){alert(e.message);}}
 async function delRoom(id){if(!confirm('Remove this room?'))return;try{await DEL('rooms','id=eq.'+id);await loadAll();renderAdmin();showToast('Removed');}catch(e){alert(e.message);}}
@@ -1584,7 +1683,8 @@ function openModal(type,id){
         <div class="r2"><div class="field"><label>Service number</label><input id="m-sv" placeholder="10001"/></div><div class="field"><label>Temp password</label><input type="text" id="m-pw" placeholder="min 8 chars + number"/></div></div>
         <div style="font-size:11px;color:var(--faint)">Min 8 chars, one letter and one number. Staff will set their own on first login.</div>
         <div class="field"><label>Full name</label><input id="m-fn"/></div>
-        <div class="field"><label>Email</label><input type="email" id="m-em"/></div>
+        <div class="field"><label>Email <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label><input type="email" id="m-em"/></div>
+        <div class="field"><label>Telegram Chat ID <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label><input id="m-tg" placeholder="e.g. 123456789"/></div>
         <div class="field"><label>Section</label><select id="m-ss">${DB.sections.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
         <label class="toggle-row"><input type="checkbox" id="m-admin"/><span>Grant admin access</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-viewall"/><span>Can view everyone's schedule</span></label>
@@ -1598,6 +1698,7 @@ function openModal(type,id){
         <div class="field"><label>Service no.</label><input readonly value="${s.svc_no}"/></div>
         <div class="field"><label>Full name</label><input id="m-fn" value="${esc(s.name)}"/></div>
         <div class="field"><label>Email</label><input type="email" id="m-em" value="${esc(s.email||'')}"/></div>
+        <div class="field"><label>Telegram Chat ID</label><input id="m-tg" value="${esc(s.telegram_chat_id||'')}" placeholder="e.g. 123456789"/></div>
         <div class="field"><label>Section</label><select id="m-ss">${DB.sections.map(sec=>`<option value="${sec.id}"${sec.id===s.section_id?' selected':''}>${esc(sec.name)}</option>`).join('')}</select></div>
         <label class="toggle-row"><input type="checkbox" id="m-admin"${s.role==='admin'?' checked':''}/><span>Admin access</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-viewall"${s.can_view_all?' checked':''}/><span>Can view everyone's schedule</span></label>
@@ -1654,23 +1755,25 @@ async function saveStaff(){
   const password=document.getElementById('m-pw').value.trim();
   const name=document.getElementById('m-fn').value.trim();
   const email=document.getElementById('m-em').value.trim();
+  const telegram_chat_id=document.getElementById('m-tg').value.trim()||null;
   const section_id=parseInt(document.getElementById('m-ss').value);
   const role=document.getElementById('m-admin').checked?'admin':'staff';
   const can_view_all=document.getElementById('m-viewall').checked;
   const can_create_groups=document.getElementById('m-groups').checked;
   if(!svc_no||!password||!name){alert('Fill all required fields.');return;}
   const issue=pwdIssue(password);if(issue){alert(issue);return;}
-  try{await POST('staff',{svc_no,name,email,section_id,password,role,active:true,must_reset_password:true,can_view_all,can_create_groups});await loadAll();closeModal();renderAdmin();showToast('Staff created — they\'ll set their own password on first login');}catch(e){alert(e.message);}
+  try{await POST('staff',{svc_no,name,email,telegram_chat_id,section_id,password,role,active:true,must_reset_password:true,can_view_all,can_create_groups});await loadAll();closeModal();renderAdmin();showToast('Staff created — they\'ll set their own password on first login');}catch(e){alert(e.message);}
 }
 async function updateStaff(svc_no){
   const name=document.getElementById('m-fn').value.trim();
   const email=document.getElementById('m-em').value.trim();
+  const telegram_chat_id=document.getElementById('m-tg').value.trim()||null;
   const section_id=parseInt(document.getElementById('m-ss').value);
   const role=document.getElementById('m-admin').checked?'admin':'staff';
   const can_view_all=document.getElementById('m-viewall').checked;
   const can_create_groups=document.getElementById('m-groups').checked;
   try{
-    await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc_no),{name,email,section_id,role,can_view_all,can_create_groups});
+    await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc_no),{name,email,telegram_chat_id,section_id,role,can_view_all,can_create_groups});
     if(U.svc_no===svc_no){U.can_view_all=can_view_all;U.can_create_groups=can_create_groups;U.role=role;}
     await loadAll();closeModal();renderAdmin();showToast('Staff updated');
   }catch(e){alert(e.message);}
