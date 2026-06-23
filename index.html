@@ -513,7 +513,7 @@ function enterApp(){
   document.getElementById('who-name').textContent=U.name;
   document.getElementById('who-role').textContent=(U.sections?U.sections.name:(U.role==='admin'?'admin':'')).toLowerCase();
   showPage('app');
-  loadAll().then(()=>{buildNav();switchTab('calendar');});
+  loadAll().then(()=>{buildNav();switchTab('calendar');refreshNotifBadge();});
 }
 
 /* =================== DATA =================== */
@@ -540,9 +540,22 @@ async function loadAllMeetings(){
   return data;
 }
 async function loadMyNotifications(){
-  // Meetings where I'm a participant and RSVP is pending
   const data=await GET('participants',`select=*,meetings(*)&staff_id=eq.${U.id}&rsvp=eq.pending`);
   return data;
+}
+async function refreshNotifBadge(){
+  let count=0;
+  try{const d=await loadMyNotifications();count=d.length;}catch(e_){}
+  const label=count>0?(count>9?'9+':String(count)):null;
+  const mobileBtn=document.querySelector('.tbb[data-tab="notif"]');
+  if(mobileBtn){
+    const old=mobileBtn.querySelector('.notif-badge');if(old)old.remove();
+    if(label){const b=document.createElement('span');b.className='notif-badge';b.textContent=label;b.style.cssText='position:absolute;top:2px;right:6px;pointer-events:none';mobileBtn.style.position='relative';mobileBtn.appendChild(b);}
+  }
+  const desktopBtn=document.querySelector('.tab-btn[data-tab="notif"]');
+  if(desktopBtn){
+    desktopBtn.innerHTML=label?`Inbox <span class="notif-badge">${label}</span>`:'Inbox';
+  }
 }
 
 /* =================== NAV =================== */
@@ -941,7 +954,7 @@ async function rsvp(meetingId,response){
       await POST('participants',{meeting_id:meetingId,staff_id:U.id,name:U.name,email:U.email||null,is_external:false,rsvp:response,rsvp_note:note});
     }
     showToast(response==='accepted'?'You accepted the invite':'You declined the invite');
-    closeModal();renderCal();renderNotifications();
+    closeModal();renderCal();renderNotifications();refreshNotifBadge();
   }catch(e){alert(e.message);}
 }
 
@@ -1152,7 +1165,7 @@ async function rsvpFromNotif(meetingId,partId,response){
   try{
     await PATCH('participants',`id=eq.${partId}`,{rsvp:response,rsvp_note:note});
     showToast(response==='accepted'?'Accepted':'Declined');
-    renderNotifications();renderCal();
+    renderNotifications();renderCal();refreshNotifBadge();
   }catch(e){alert(e.message);}
 }
 
