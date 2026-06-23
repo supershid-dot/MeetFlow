@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS staff (
   created_at timestamptz DEFAULT now()
 );
 
+-- Graceful upgrade: add new columns to existing staff table
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS can_view_all      boolean NOT NULL DEFAULT false;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS can_create_groups boolean NOT NULL DEFAULT false;
+
 -- Default system admin (login: SVC000 / Admin1234, forced to reset)
 INSERT INTO staff (svc_no,name,email,password,role,active,must_reset_password,can_view_all,can_create_groups)
 VALUES ('SVC000','System Admin','','Admin1234','admin',true,false,true,true)
@@ -117,6 +121,18 @@ CREATE TABLE IF NOT EXISTS meeting_group_members (
   staff_id integer REFERENCES staff(id)          ON DELETE CASCADE,
   UNIQUE(group_id, staff_id)
 );
+
+-- ─────────────────────────── ROW LEVEL SECURITY ──────────────────
+-- This app authenticates in JavaScript using the anon key.
+-- Disable RLS on all tables so anon key requests are not blocked.
+ALTER TABLE sections             DISABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms                DISABLE ROW LEVEL SECURITY;
+ALTER TABLE staff                DISABLE ROW LEVEL SECURITY;
+ALTER TABLE meetings             DISABLE ROW LEVEL SECURITY;
+ALTER TABLE participants         DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications        DISABLE ROW LEVEL SECURITY;
+ALTER TABLE meeting_groups       DISABLE ROW LEVEL SECURITY;
+ALTER TABLE meeting_group_members DISABLE ROW LEVEL SECURITY;
 
 -- ─────────────────────────── INDEXES ──────────────────────────────
 CREATE INDEX IF NOT EXISTS meetings_date_idx           ON meetings(date);
