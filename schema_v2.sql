@@ -150,6 +150,29 @@ CREATE INDEX IF NOT EXISTS participants_staff_idx      ON participants(staff_id)
 CREATE INDEX IF NOT EXISTS grp_members_group_idx       ON meeting_group_members(group_id);
 CREATE INDEX IF NOT EXISTS grp_members_staff_idx       ON meeting_group_members(staff_id);
 
+-- ─────────────────────────── RECURRING MEETINGS ──────────────────
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS recurrence_id   text;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS recurrence_rule text;
+
+-- ─────────────────────────── MEETING NOTES ────────────────────────
+ALTER TABLE meetings     ADD COLUMN IF NOT EXISTS minutes              text;
+ALTER TABLE meetings     ADD COLUMN IF NOT EXISTS minutes_updated_at   timestamptz;
+ALTER TABLE meetings     ADD COLUMN IF NOT EXISTS minutes_updated_by   integer REFERENCES staff(id);
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS personal_notes       text;
+
+-- ─────────────────────────── ROOM BLOCKS ──────────────────────────
+CREATE TABLE IF NOT EXISTS room_blocks (
+  id        serial  PRIMARY KEY,
+  room_id   integer REFERENCES rooms(id) ON DELETE CASCADE,
+  date_from date    NOT NULL,
+  date_to   date    NOT NULL,
+  reason    text,
+  created_by integer REFERENCES staff(id),
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE room_blocks DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS room_blocks_room_idx ON room_blocks(room_id);
+
 -- ─────────────────────────── DONE ─────────────────────────────────
 -- After running this, open the app, paste your Supabase URL + anon key,
 -- then sign in with service number SVC000 / Admin1234.
