@@ -642,7 +642,7 @@ function enterApp(){
   document.getElementById('who-name').textContent=U.name;
   document.getElementById('who-role').textContent=(U.sections?U.sections.name:(U.role==='admin'?'admin':'')).toLowerCase();
   showPage('app');
-  loadAll().then(()=>{buildNav();switchTab('calendar');});
+  loadAll().then(()=>{buildNav();switchTab('calendar');startNotifLoop();});
 }
 
 /* =================== DATA =================== */
@@ -1175,6 +1175,7 @@ async function saveMeeting(){
       await Promise.all(window._mparticipants.map(p=>POST('participants',{meeting_id:mRow.id,staff_id:p.staff_id||null,name:p.name,email:p.email||null,is_external:p.is_external,rsvp:p.rsvp})));
     }
     closeModal();showToast('Meeting scheduled');refreshActiveViews();
+    scheduleNotifs(mRow.id);
   }catch(e){showAlert(err,'Error: '+e.message);btn.disabled=false;btn.textContent='Schedule';}
 }
 
@@ -1386,6 +1387,7 @@ async function updateMeeting(meetingId){
     }
     if(notify){await sendMeetingComm(meetingId,'update',reason,true);}
     closeModal();showToast('Meeting updated');refreshActiveViews();
+    scheduleNotifs(meetingId);
   }catch(e){showAlert(err,'Error: '+e.message);btn.disabled=false;btn.textContent='Save changes';}
 }
 
@@ -1439,52 +1441,134 @@ async function sendTg(token,chatId,text){
   }catch(e){return false;}
 }
 
+/* =================== TELEGRAM MSG BUILDER =================== */
+function buildTgMsg(m,type,allParts,extra){
+  const d=new Date(m.date+'T12:00:00');
+  const dateStr=d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const timeStr=`${fTime(m.start_slot)} – ${fTime(m.start_slot+m.duration)}`;
+  const place=m.meeting_link?m.meeting_link:(m.location||'');
+  const placeLine=place?`\n📍 ${place}`:'';
+  const names=(allParts||[]).map(p=>p.name).filter(Boolean).join(', ');
+  const attendeesLine=names?`\n👥 ${names}`:'';
+  const by=esc(m.created_by_name||'');
+  const extraLine=extra?`\n\n${esc(extra)}`:'';
+  if(type==='reminder')
+    return `⏰ <b>${esc(m.title)}</b>\n\n🗓 ${dateStr} · ${timeStr}${placeLine}${attendeesLine}\n\nStarts in 30 minutes.`;
+  if(type==='cancellation')
+    return `❌ <b>${esc(m.title)}</b>\n\n🗓 ${dateStr} · ${timeStr}${extraLine}\n\n— ${by}`;
+  if(type==='update')
+    return `✏️ <b>${esc(m.title)} — Updated</b>\n\n🗓 ${dateStr} · ${timeStr}${placeLine}${attendeesLine}${extraLine}\n\n— ${by}`;
+  // invitation / message
+  return `📋 <b>${esc(m.title)}</b>\n\n🗓 ${dateStr} · ${timeStr}${placeLine}${attendeesLine}${extraLine}\n\nOrganised by ${by}`;
+}
+
+/* =================== AUTO-SCHEDULE NOTIFICATIONS =================== */
+async function scheduleNotifs(meetingId){
+  const tgToken=loadTgToken();if(!tgToken)return;
+  let m,parts;
+  try{
+    const mrows=await GET('meetings',`select=*,participants(*)&id=eq.${meetingId}`);
+    m=mrows[0];if(!m)return;
+    parts=m.participants||[];
+  }catch(e){return;}
+
+  const now=new Date();
+  const today=todayStr();
+
+  // Invitation time: same-day → now; future day → today 20:30 (or now if already past)
+  let inviteAt=new Date();
+  if(m.date>today){
+    inviteAt=new Date();inviteAt.setHours(20,30,0,0);
+    if(inviteAt<now)inviteAt=now;
+  }
+
+  // Reminder time: 30 min before meeting start
+  const meetingStartMs=new Date(m.date+'T00:00:00').getTime()+m.start_slot*15*60*1000;
+  const reminderAt=new Date(meetingStartMs-30*60*1000);
+
+  // Build recipient list (participants + creator if not already a participant)
+  const recipients=[];
+  for(const p of parts){
+    const s=p.staff_id?DB.staff.find(x=>x.id===p.staff_id):null;
+    if(s?.telegram_chat_id)recipients.push({chatId:s.telegram_chat_id,pid:p.id});
+  }
+  if(!parts.find(p=>p.staff_id===m.created_by)){
+    const cs=DB.staff.find(x=>x.id===m.created_by);
+    if(cs?.telegram_chat_id)recipients.push({chatId:cs.telegram_chat_id,pid:null});
+  }
+  if(!recipients.length)return;
+
+  // Clear previous pending notifs for this meeting to avoid duplicates
+  try{await DEL('notifications',`meeting_id=eq.${meetingId}&status=eq.pending`);}catch(e){}
+
+  for(const r of recipients){
+    try{
+      await POST('notifications',{meeting_id:meetingId,participant_id:r.pid,type:'invitation',
+        status:'pending',scheduled_for:inviteAt.toISOString(),recipient_chat_id:r.chatId});
+      if(reminderAt>now){
+        await POST('notifications',{meeting_id:meetingId,participant_id:r.pid,type:'reminder',
+          status:'pending',scheduled_for:reminderAt.toISOString(),recipient_chat_id:r.chatId});
+      }
+    }catch(e){}
+  }
+}
+
+/* =================== NOTIFICATION POLLER =================== */
+async function checkPendingNotifs(){
+  const tgToken=loadTgToken();if(!tgToken)return;
+  try{
+    const nowIso=new Date().toISOString();
+    const pending=await GET('notifications',
+      `select=*&status=eq.pending&recipient_chat_id=not.is.null&scheduled_for=lte.${encodeURIComponent(nowIso)}&order=scheduled_for.asc&limit=50`);
+    if(!pending.length)return;
+    const midSet=[...new Set(pending.map(n=>n.meeting_id))];
+    const meetMap={};
+    for(const mid of midSet){
+      try{const r=await GET('meetings',`select=*,participants(*)&id=eq.${mid}`);if(r[0])meetMap[mid]=r[0];}catch(e){}
+    }
+    for(const n of pending){
+      const m=meetMap[n.meeting_id];if(!m)continue;
+      const msg=buildTgMsg(m,n.type,m.participants||[]);
+      const ok=await sendTg(tgToken,n.recipient_chat_id,msg);
+      if(ok){
+        try{await PATCH('notifications',`id=eq.${n.id}`,{status:'sent',sent_at:new Date().toISOString()});}catch(e){}
+      }
+    }
+  }catch(e){}
+}
+function startNotifLoop(){checkPendingNotifs();setInterval(checkPendingNotifs,60000);}
+
 /* =================== NOTIFY =================== */
 async function sendMeetingComm(meetingId,type,extra,silent,skipLog){
   let bodyExtra=extra;
   if(type==='message'&&!silent){const el=document.getElementById('email-body');bodyExtra=el?el.value.trim():'';if(!bodyExtra){showToast('Enter a message.');return;}}
   const parts=await GET('participants',`select=*&meeting_id=eq.${meetingId}`);
   const mrows=await GET('meetings',`select=*&id=eq.${meetingId}`);const m=mrows[0]||{};
-  const when=`${new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})} ${fTime(m.start_slot)}–${fTime(m.start_slot+m.duration)}`;
-  const where=m.meeting_link?`${m.meeting_link}`:(m.location||'');
-  let subject,intro,tgIcon;
-  if(type==='reminder'){subject=`Reminder: ${m.title}`;intro=`This is a reminder for "${m.title}".`;tgIcon='🔔';}
-  else if(type==='update'){subject=`Updated: ${m.title}`;intro=`The meeting "${m.title}" has been updated.`;tgIcon='✏️';}
-  else if(type==='cancellation'){subject=`Cancelled: ${m.title}`;intro=`The meeting "${m.title}" has been cancelled.`;tgIcon='❌';}
-  else{subject=`Regarding: ${m.title}`;intro=`Regarding the meeting "${m.title}".`;tgIcon='📅';}
-  const emailBody=`${intro}\n\nWhen: ${when}\n${where?'Location/Link: '+where+'\n':''}${bodyExtra?'\n'+bodyExtra+'\n':''}\n— ${U.name}`;
-
+  const tgMsgType=type==='message'?'invitation':type;
+  const tgMsg=buildTgMsg(m,tgMsgType,parts,bodyExtra);
+  const subject=type==='reminder'?`Reminder: ${m.title}`:type==='update'?`Updated: ${m.title}`:type==='cancellation'?`Cancelled: ${m.title}`:`Regarding: ${m.title}`;
+  const emailBody=tgMsg.replace(/<[^>]+>/g,'');
   const tgToken=loadTgToken();
-  const emailFallback=[];
-  let tgSent=0;
-
+  const emailFallback=[];let tgSent=0;
   for(const p of parts){
-    const staffRow=p.staff_id?DB.staff.find(s=>s.id===p.staff_id):null;
-    const chatId=staffRow?.telegram_chat_id;
-    if(tgToken&&chatId){
-      const tgText=`${tgIcon} <b>${subject}</b>\n\n${intro}\n\n📅 <b>When:</b> ${when}${where?'\n📍 <b>Where:</b> '+where:''}${bodyExtra?'\n\n'+bodyExtra:''}\n\n— ${U.name}`;
-      const ok=await sendTg(tgToken,chatId,tgText);
-      if(ok){tgSent++;continue;}
-    }
+    const s=p.staff_id?DB.staff.find(x=>x.id===p.staff_id):null;
+    const chatId=s?.telegram_chat_id;
+    if(tgToken&&chatId){const ok=await sendTg(tgToken,chatId,tgMsg);if(ok){tgSent++;continue;}}
     if(p.email)emailFallback.push(p);
   }
-
   if(!skipLog){
     const logParts=parts.filter(p=>p.email);
     try{await Promise.all(logParts.map(p=>POST('notifications',{meeting_id:meetingId,participant_id:p.id,type:(type==='message'?'invitation':type),subject,body:emailBody,status:'sent'})));}catch(e){}
   }
-
   if(emailFallback.length){
     const emails=emailFallback.map(p=>p.email).join(',');
     window.open(`mailto:${encodeURIComponent(emails)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`,'_blank');
   }
-
   if(!silent){
     const info=[];
     if(tgSent>0)info.push(`${tgSent} via Telegram`);
     if(emailFallback.length>0)info.push(`${emailFallback.length} via email`);
     if(info.length)showToast('Sent: '+info.join(', '));
-    else if(!tgToken&&!emailFallback.length)showToast('Set up Telegram in Admin to send notifications');
     else showToast('No recipients have Telegram or email');
   }
 }

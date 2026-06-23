@@ -95,6 +95,11 @@ ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_note      text;
 ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_marked_by integer REFERENCES staff(id);
 ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_marked_at timestamptz;
 
+-- Graceful upgrade: add scheduled notification columns
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS scheduled_for    timestamptz;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sent_at          timestamptz;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS recipient_chat_id text;
+
 -- ─────────────────────────── NOTIFICATIONS ────────────────────────
 CREATE TABLE IF NOT EXISTS notifications (
   id             serial PRIMARY KEY,
