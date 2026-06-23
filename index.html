@@ -347,7 +347,7 @@ tbody tr:hover td{background:var(--panel2)}
   <header class="topbar">
     <div class="brand">
       <div class="brandmark"><i class="ti ti-calendar-check" aria-hidden="true"></i></div>
-      <span class="hidden" style="display:block" id="brand-text">MeetFlow</span>
+      <span id="brand-text" style="font-weight:800;font-size:14px;letter-spacing:-.02em">MeetFlow</span>
     </div>
     <div class="spacer"></div>
     <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme"><i class="ti ti-moon" id="theme-icon" aria-hidden="true"></i></button>
@@ -423,6 +423,16 @@ tbody tr:hover td{background:var(--panel2)}
     <!-- ADMIN TAB -->
     <div id="tab-admin" class="hidden">
       <div class="ph"><div class="ph-eyebrow">Admin</div><div class="ph-title">Manage</div><div class="ph-sub">Staff, sections, rooms and groups</div></div>
+      <div class="panel" style="margin-bottom:14px" id="cal-hours-panel">
+        <div class="panel-head"><div class="panel-title"><i class="ti ti-clock" aria-hidden="true"></i>Calendar Display Hours</div></div>
+        <div style="padding:12px 16px">
+          <div class="r2" style="margin-bottom:10px">
+            <div class="field"><label>Show from</label><select id="cal-start-sel"></select></div>
+            <div class="field"><label>Show until</label><select id="cal-end-sel"></select></div>
+          </div>
+          <button class="btn btn-accent btn-sm" onclick="saveCalHours()"><i class="ti ti-check" aria-hidden="true"></i>Save hours</button>
+        </div>
+      </div>
       <div class="adgrid">
         <div class="panel">
           <div class="panel-head"><div class="panel-title"><i class="ti ti-tag" aria-hidden="true"></i>Sections</div><button class="btn btn-accent btn-sm" onclick="openModal('add-section')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
@@ -492,6 +502,23 @@ function todayStr(){return dStr(new Date());}
 function pwdIssue(p){if(!p||p.length<8)return'Minimum 8 characters.';if(!/[0-9]/.test(p))return'Must include at least one number.';if(!/[A-Za-z]/.test(p))return'Must include at least one letter.';return null;}
 const MODE_LABEL={physical:'In person',online:'Online',both:'Hybrid'};
 const MODE_ICON={physical:'ti-map-pin',online:'ti-video',both:'ti-device-laptop'};
+
+/* =================== CALENDAR HOURS =================== */
+let CAL_START=8,CAL_END=20;
+function loadCalHours(){CAL_START=parseInt(localStorage.getItem('mf_cal_start')||'8');CAL_END=parseInt(localStorage.getItem('mf_cal_end')||'20');}
+function buildHourSelects(){
+  const s=document.getElementById('cal-start-sel');const e=document.getElementById('cal-end-sel');if(!s||!e)return;
+  s.innerHTML=Array.from({length:24},(_,i)=>i).map(h=>`<option value="${h}"${h===CAL_START?' selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('');
+  e.innerHTML=Array.from({length:24},(_,i)=>i+1).map(h=>`<option value="${h}"${h===CAL_END?' selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('');
+}
+function saveCalHours(){
+  const ns=parseInt(document.getElementById('cal-start-sel').value);
+  const ne=parseInt(document.getElementById('cal-end-sel').value);
+  if(ns>=ne){alert('Start must be before end.');return;}
+  CAL_START=ns;CAL_END=ne;
+  localStorage.setItem('mf_cal_start',CAL_START);localStorage.setItem('mf_cal_end',CAL_END);
+  showToast('Calendar hours saved');refreshActiveViews();
+}
 
 /* =================== SUPABASE REST =================== */
 let SB_URL='',SB_KEY='';
@@ -692,11 +719,11 @@ function buildDayStrip(stripEl,dates,today,selIdx,onPick){
 function buildAgenda(agendaEl,date,today,meetings,opts){
   agendaEl.innerHTML='';
   const isPastDay=date<today;const ds=dStr(date);
-  for(let s=0;s<DAY_SLOTS;s++){
+  for(let s=CAL_START*4;s<CAL_END*4;s++){
     const slotMs=meetings.filter(m=>m.date===ds&&s>=m.start_slot&&s<m.start_slot+m.duration);
     const newMs=slotMs.filter(m=>m.start_slot===s);
     if(slotMs.length>0&&newMs.length===0)continue; // ongoing — skip
-    if(slotMs.length===0&&s%4!==0)continue; // empty non-hour slot — skip
+    if(slotMs.length===0&&s%2!==0)continue; // empty: show every 30 min
     const row=document.createElement('div');row.className='ag-row'+(isPastDay?' past':'');
     const tc=document.createElement('div');tc.className='ag-time';
     const bc=document.createElement('div');bc.className='ag-body';
@@ -709,7 +736,7 @@ function buildAgenda(agendaEl,date,today,meetings,opts){
       bc.innerHTML=`<div class="ag-bar" style="background:${c.tx}"></div><div class="ag-info"><div class="ag-title">${typeLabel} ${title}</div><div class="ag-sub">${sub}</div></div>`;
       row.onclick=()=>viewMeetingModal(m);
     }else{
-      tc.innerHTML=`<span>${fTime(s)}</span><span>${fTime(s+4)}</span>`;
+      tc.innerHTML=`<span>${fTime(s)}</span><span>${fTime(s+2)}</span>`;
       if(!isPastDay&&opts.clickable){bc.innerHTML='<div class="ag-add"><i class="ti ti-plus" aria-hidden="true"></i>'+(opts.addLabel||'Schedule')+'</div>';row.onclick=()=>opts.onSlot(ds,s);}
       else{bc.innerHTML='<div class="ag-empty">Free</div>';}
     }
@@ -725,12 +752,13 @@ function buildWeekGrid(gridEl,dates,today,meetings,opts){
     if(i===6)h.style.borderRight='none';
     h.innerHTML=`<div class="wg-dn">${DN[d.getDay()]}</div><div class="wg-dd">${d.getDate()}</div>`;gridEl.appendChild(h);
   });
-  for(let s=0;s<DAY_SLOTS;s++){
+  for(let s=CAL_START*4;s<CAL_END*4;s++){
     const hourline=s%4===3;
-    const tl=document.createElement('div');tl.className='wg-tl';if(s===DAY_SLOTS-1)tl.style.borderBottom='none';tl.textContent=s%4===0?fTime(s):'';gridEl.appendChild(tl);
+    const isLast=s===CAL_END*4-1;
+    const tl=document.createElement('div');tl.className='wg-tl';if(isLast)tl.style.borderBottom='none';tl.textContent=s%4===0?fTime(s):'';gridEl.appendChild(tl);
     dates.forEach((d,di)=>{
       const cell=document.createElement('div');cell.className='wg-slot'+(hourline?' hourline':'');
-      const isPast=d<today;if(s===DAY_SLOTS-1)cell.style.borderBottom='none';if(di===6)cell.style.borderRight='none';
+      const isPast=d<today;if(isLast)cell.style.borderBottom='none';if(di===6)cell.style.borderRight='none';
       if(isPast)cell.classList.add('past');
       const ds=dStr(d);
       const bks=meetings.filter(m=>m.date===ds&&s>=m.start_slot&&s<m.start_slot+m.duration);
@@ -751,8 +779,6 @@ function buildWeekGrid(gridEl,dates,today,meetings,opts){
       gridEl.appendChild(cell);
     });
   }
-  // Scroll to 08:00 (slot 32) by default
-  requestAnimationFrame(()=>{const w=gridEl.parentElement;if(w&&w.scrollTop===0)w.scrollTop=32*18;});
 }
 
 /* =================== CALENDAR TAB (schedule) =================== */
@@ -814,11 +840,12 @@ function bookSelectedRoom(){
 /* =================== ROOM AVAILABILITY / DURATION =================== */
 /* Max consecutive free slots in a room from start_slot (0 = start itself is taken). */
 async function computeMaxDuration(date,room_id,start_slot,excludeId){
-  if(!room_id||!date)return DAY_SLOTS-start_slot;
+  const dayEnd=CAL_END*4;
+  if(!room_id||!date)return dayEnd-start_slot;
   let ms=[];
-  try{ms=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&type=eq.internal`);}catch(e){return DAY_SLOTS-start_slot;}
+  try{ms=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&type=eq.internal`);}catch(e){return dayEnd-start_slot;}
   ms=ms.filter(m=>m.id!==excludeId);
-  let limit=DAY_SLOTS;
+  let limit=dayEnd;
   for(const m of ms){
     if(m.start_slot<=start_slot&&start_slot<m.start_slot+m.duration)return 0;
     if(m.start_slot>start_slot)limit=Math.min(limit,m.start_slot);
@@ -840,7 +867,7 @@ async function refreshDurationOptions(){
   }
   let maxDur;
   if(room_id){maxDur=await computeMaxDuration(date,room_id,start,window._editMeetingId||null);}
-  else{maxDur=DAY_SLOTS-start;}
+  else{maxDur=CAL_END*4-start;}
   if(maxDur<=0){
     durSel.innerHTML='<option value="">— room busy at this time —</option>';
     return;
@@ -862,7 +889,7 @@ function groupSelectBlock(){
 function openNewMeetingModal(preDate,preSlot,preRoomId){
   const roomOpts=DB.rooms.map(r=>`<option value="${r.id}"${r.id===preRoomId?' selected':''}>${esc(r.name)}</option>`).join('');
   const preD=preDate||todayStr();
-  const preS=preSlot==null?32:preSlot; // default 08:00
+  const preS=preSlot==null?CAL_START*4:preSlot; // default = admin-set start hour
   window._editMeetingId=null;window._mtype='internal';window._mprivacy='public';window._mmode='physical';window._mnoroom=false;
   window._mparticipants=[{staff_id:U.id,name:U.name,email:U.email||'',is_external:false,rsvp:'accepted'}];
 
@@ -1026,8 +1053,17 @@ function addExtParticipant(){
   renderParticipantList();
 }
 function removeParticipant(idx){window._mparticipants.splice(idx,1);renderParticipantList();}
+function refreshStaffDropdown(){
+  const sel=document.getElementById('nm-add-staff');if(!sel)return;
+  const addedIds=new Set((window._mparticipants||[]).filter(p=>p.staff_id).map(p=>p.staff_id));
+  sel.innerHTML='<option value="">— select —</option>'+
+    DB.staff.filter(s=>s.id!==U.id&&!addedIds.has(s.id))
+      .map(s=>`<option value="${s.id}">${esc(s.name)}${s.sections?' · '+esc(s.sections.name):''}</option>`)
+      .join('');
+}
 function renderParticipantList(){
   const c=document.getElementById('nm-participants');if(!c)return;
+  refreshStaffDropdown();
   c.innerHTML=window._mparticipants.map((p,i)=>{
     const isSelf=p.staff_id===U.id;
     return`<div class="prow">
@@ -1457,7 +1493,7 @@ async function rsvpFromNotif(meetingId,partId,response){
 
 /* =================== ADMIN =================== */
 async function renderAdmin(){
-  await loadAll();buildStaffSelect();buildRoomSelect();
+  await loadAll();buildStaffSelect();buildRoomSelect();buildHourSelects();
   document.getElementById('sec-tbody').innerHTML=DB.sections.map(s=>{
     const c=getSC(s.name);
     return`<tr><td><span class="tag" style="background:${c.bg};color:${c.tx}">${esc(s.name)}</span></td>
@@ -1655,6 +1691,7 @@ let _rt;window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout((
 
 /* =================== INIT =================== */
 (function(){
+  loadCalHours();
   const cfg=loadCfg();
   if(cfg){initSB(cfg.u,cfg.k);showPage('login');}
   else showPage('config');
