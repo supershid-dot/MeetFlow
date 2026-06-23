@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS meetings (
 ALTER TABLE meetings ADD COLUMN IF NOT EXISTS meeting_mode  text    DEFAULT 'physical';
 ALTER TABLE meetings ADD COLUMN IF NOT EXISTS meeting_link  text;
 ALTER TABLE meetings ADD COLUMN IF NOT EXISTS no_room       boolean DEFAULT false;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS is_prebooked  boolean DEFAULT false;
 
 -- ─────────────────────────── PARTICIPANTS ─────────────────────────
 CREATE TABLE IF NOT EXISTS participants (

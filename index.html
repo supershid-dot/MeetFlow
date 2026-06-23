@@ -240,6 +240,15 @@ tbody tr:hover td{background:var(--panel2)}
 .mcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color var(--ease)}
 .mcard:hover{border-color:var(--accent)}
 .mcard.mcard-past{opacity:.65}
+.mcard.mcard-prebooked{border-style:dashed;border-color:var(--accent)}
+/* Segmented toggle (Upcoming / Past switch) */
+.seg-ctrl{display:inline-flex;background:var(--line);border-radius:8px;padding:3px;gap:2px}
+.seg-ctrl .seg{border:none;background:transparent;padding:5px 20px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:var(--dim);transition:all var(--ease)}
+.seg-ctrl .seg.active{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+/* Day-of-week checkboxes in pre-booking modal */
+.dow-wrap{display:flex;gap:5px;flex-wrap:wrap}
+.dow-wrap label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;cursor:pointer;padding:5px 11px;border:1px solid var(--line);border-radius:6px;user-select:none;transition:background var(--ease),color var(--ease),border-color var(--ease)}
+.dow-wrap label:has(input:checked){background:var(--accent);color:#fff;border-color:var(--accent)}
 .mcard-bar{height:3px}
 .mcard-body{padding:12px 14px}
 .mcard-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
@@ -426,16 +435,23 @@ tbody tr:hover td{background:var(--panel2)}
     <!-- MEETINGS TAB -->
     <div id="tab-meetings" class="hidden">
       <div class="ph"><div class="ph-eyebrow">My Meetings</div><div class="ph-title">All Meetings</div><div class="ph-sub">Internal bookings and external meetings</div></div>
-      <div class="ctrl-row" style="margin-bottom:14px">
+      <div class="ctrl-row" style="margin-bottom:10px">
         <div class="pill-group" id="meetings-filter">
           <button class="pill active" data-filter="all" onclick="filterMeetings('all',this)">All</button>
           <button class="pill" data-filter="today" onclick="filterMeetings('today',this)"><i class="ti ti-calendar-due" aria-hidden="true"></i> Today</button>
           <button class="pill" data-filter="internal" onclick="filterMeetings('internal',this)"><i class="ti ti-door" aria-hidden="true"></i> Internal</button>
           <button class="pill" data-filter="external" onclick="filterMeetings('external',this)"><i class="ti ti-building" aria-hidden="true"></i> External</button>
-          <button class="pill" data-filter="upcoming" onclick="filterMeetings('upcoming',this)">Upcoming</button>
-          <button class="pill" data-filter="past" onclick="filterMeetings('past',this)">Past</button>
         </div>
-        <button class="btn btn-accent btn-sm" onclick="openNewMeetingModal()"><i class="ti ti-plus" aria-hidden="true"></i>New</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm hidden" id="btn-prebook" onclick="openPreBookingModal()"><i class="ti ti-calendar-repeat" aria-hidden="true"></i>Pre-book</button>
+          <button class="btn btn-accent btn-sm" onclick="openNewMeetingModal()"><i class="ti ti-plus" aria-hidden="true"></i>New</button>
+        </div>
+      </div>
+      <div class="ctrl-row" style="margin-bottom:14px">
+        <div class="seg-ctrl" id="time-seg">
+          <button class="seg active" onclick="setTimeSeg('upcoming',this)"><i class="ti ti-calendar-up" aria-hidden="true"></i> Upcoming</button>
+          <button class="seg" onclick="setTimeSeg('past',this)"><i class="ti ti-calendar-down" aria-hidden="true"></i> Past</button>
+        </div>
       </div>
       <div id="meetings-list" class="stack"></div>
     </div>
@@ -589,7 +605,7 @@ function resetConfig(){localStorage.removeItem('sb_url');localStorage.removeItem
 /* =================== STATE =================== */
 let U=null,weekOffset=0,rmWeekOffset=0,selectedStaffId=null,selectedDayIdx=null,rmDayIdx=null,selectedRoomId=null;
 let DB={sections:[],rooms:[],staff:[],groups:[],meetings:[]};
-let allMeetingsCache=[],meetingFilter='all';
+let allMeetingsCache=[],meetingFilter='all',meetingTimeSeg='upcoming';
 
 function showPage(p){['config','loading','login','newpwd','app'].forEach(x=>document.getElementById(x+'-page').classList.add('hidden'));document.getElementById(p+'-page').classList.remove('hidden');}
 
@@ -698,6 +714,8 @@ function buildNav(){
   </div>
   <button class="sb-footer-btn" onclick="toggleTheme()"><i class="ti ti-moon" id="theme-icon-sb" aria-hidden="true"></i>Toggle theme</button>
   <button class="sb-footer-btn" onclick="doLogout()"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</button>`;
+  // Show Pre-book button for admin only
+  const pbBtn=document.getElementById('btn-prebook');if(pbBtn){if(isAdmin)pbBtn.classList.remove('hidden');else pbBtn.classList.add('hidden');}
   // Sync theme icon
   const t=document.documentElement.getAttribute('data-theme');
   const sbic=document.getElementById('theme-icon-sb');if(sbic)sbic.className='ti '+(t==='dark'?'ti-sun':'ti-moon');
@@ -1208,6 +1226,7 @@ function viewMeetingModal(m){
     <button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button>
   </div>
   <div class="modal-body">
+    ${m.is_prebooked?`<div class="alert a-warn" style="margin-bottom:14px"><i class="ti ti-calendar-clock" aria-hidden="true"></i> <strong>Pre-booked slot</strong> — details are pending.${canEditNow?` Click <strong>Complete Details</strong> below to fill in the meeting information.`:' Contact your admin to complete this booking.'}</div>`:''}
     <div class="r2" style="margin-bottom:12px">
       <div><div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Date</div><div class="mono" style="font-weight:700">${new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div>
       <div><div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Time</div><div class="mono" style="font-weight:700">${fTime(m.start_slot)} – ${fTime(m.start_slot+m.duration)}</div></div>
@@ -1263,8 +1282,8 @@ function viewMeetingModal(m){
   </div>
   <div class="modal-foot">
     <button class="btn" onclick="closeModal()">Close</button>
-    ${canEditNow?`<button class="btn btn-warn" onclick="openEditMeetingModal(${m.id})"><i class="ti ti-edit" aria-hidden="true"></i>Edit</button>
-    <button class="btn btn-danger" onclick="openCancelModal(${m.id})"><i class="ti ti-trash" aria-hidden="true"></i>Cancel meeting</button>`:''}
+    ${canEditNow?`<button class="btn ${m.is_prebooked?'btn-accent':'btn-warn'}" onclick="openEditMeetingModal(${m.id})"><i class="ti ti-${m.is_prebooked?'calendar-check':'edit'}" aria-hidden="true"></i>${m.is_prebooked?'Complete Details':'Edit'}</button>
+    <button class="btn btn-danger" onclick="openCancelModal(${m.id})"><i class="ti ti-trash" aria-hidden="true"></i>Cancel</button>`:''}
   </div>`);
 }
 
@@ -1295,6 +1314,13 @@ function switchNotifyTab(tab,btn){
   const panel=document.getElementById('nt-'+tab);if(panel)panel.style.display='';
   btn.closest('.pill-group').querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active');
+}
+function setTimeSeg(seg,btn){
+  meetingTimeSeg=seg;
+  document.querySelectorAll('#time-seg .seg').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const activeBtn=document.querySelector('.pill[data-filter].active');
+  filterMeetings(meetingFilter,activeBtn);
 }
 
 /* =================== EDIT MEETING =================== */
@@ -1399,7 +1425,7 @@ async function updateMeeting(meetingId){
   const reason=document.getElementById('em-reason').value.trim();
   const btn=document.getElementById('nm-save');btn.disabled=true;btn.textContent='Saving…';
   try{
-    await PATCH('meetings',`id=eq.${meetingId}`,{title,type,meeting_mode:mode,meeting_link,privacy:window._mprivacy,date,start_slot,duration,notes,location,no_room,room_id:room_id||null});
+    await PATCH('meetings',`id=eq.${meetingId}`,{title,type,meeting_mode:mode,meeting_link,privacy:window._mprivacy,date,start_slot,duration,notes,location,no_room,room_id:room_id||null,is_prebooked:false});
     await DEL('participants',`meeting_id=eq.${meetingId}`);
     if(window._mparticipants.length){
       await Promise.all(window._mparticipants.map(p=>POST('participants',{meeting_id:meetingId,staff_id:p.staff_id||null,name:p.name,email:p.email||null,is_external:p.is_external||false,rsvp:p.rsvp||'pending',rsvp_note:p.rsvp_note||null})));
@@ -1690,6 +1716,89 @@ async function sendMeetingComm(meetingId,type,extra,silent,skipLog){
   }
 }
 
+/* =================== PRE-BOOKING =================== */
+function openPreBookingModal(){
+  const secOpts=DB.sections.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  const roomOpts='<option value="">No specific room</option>'+DB.rooms.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dowHtml=DAYS.map((d,i)=>`<label><input type="checkbox" class="pb-dow" value="${i}"${i>=1&&i<=5?' checked':''}> ${d}</label>`).join('');
+  showModal(`
+  <div class="modal-head"><div class="modal-title"><i class="ti ti-calendar-repeat" aria-hidden="true"></i> Pre-book Meeting Slots</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+  <div class="modal-body"><div class="stack">
+    <div class="alert a-info" style="font-size:12px"><i class="ti ti-info-circle" aria-hidden="true"></i>Creates placeholder bookings for a section. Section staff can later open each slot to complete the full details.</div>
+    <div class="field"><label>Meeting Title *</label><input id="pb-title" placeholder="e.g. Weekly Section Briefing"/></div>
+    <div class="r2">
+      <div class="field"><label>Section *</label><select id="pb-section"><option value="">Select section…</option>${secOpts}</select></div>
+      <div class="field"><label>Room (optional)</label><select id="pb-room">${roomOpts}</select></div>
+    </div>
+    <div class="r2">
+      <div class="field"><label>From date *</label><input type="date" id="pb-from" value="${todayStr()}"/></div>
+      <div class="field"><label>To date *</label><input type="date" id="pb-to"/></div>
+    </div>
+    <div class="field"><label>Day(s) of week *</label><div class="dow-wrap">${dowHtml}</div></div>
+    <div class="r2">
+      <div class="field"><label>Start time *</label><select id="pb-start">${startTimeOptions(36)}</select></div>
+      <div class="field"><label>End time *</label><select id="pb-end">${startTimeOptions(42)}</select></div>
+    </div>
+    <div id="pb-preview" style="font-size:12px;color:var(--dim);margin-top:2px"></div>
+    <div id="pb-err" class="alert a-bad hidden"></div>
+  </div></div>
+  <div class="modal-foot">
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-accent" id="pb-save" onclick="savePreBooking()"><i class="ti ti-calendar-plus" aria-hidden="true"></i>Create Pre-bookings</button>
+  </div>`);
+  // live preview of how many slots will be created
+  function updatePreview(){
+    const f=document.getElementById('pb-from').value,t=document.getElementById('pb-to').value;
+    const days=[...document.querySelectorAll('.pb-dow:checked')].map(c=>parseInt(c.value));
+    if(!f||!t||!days.length||t<f){document.getElementById('pb-preview').textContent='';return;}
+    let n=0,cur=new Date(f+'T00:00:00'),end=new Date(t+'T00:00:00');
+    while(cur<=end){if(days.includes(cur.getDay()))n++;cur.setDate(cur.getDate()+1);}
+    document.getElementById('pb-preview').textContent=`→ Will create ${n} slot${n!==1?'s':''} in this range`;
+  }
+  document.getElementById('pb-from').oninput=updatePreview;
+  document.getElementById('pb-to').oninput=updatePreview;
+  document.querySelectorAll('.pb-dow').forEach(cb=>cb.onchange=updatePreview);
+}
+async function savePreBooking(){
+  const title=document.getElementById('pb-title').value.trim();
+  const sectionId=parseInt(document.getElementById('pb-section').value)||null;
+  const roomId=parseInt(document.getElementById('pb-room').value)||null;
+  const fromDate=document.getElementById('pb-from').value;
+  const toDate=document.getElementById('pb-to').value;
+  const startSlot=parseInt(document.getElementById('pb-start').value);
+  const endSlot=parseInt(document.getElementById('pb-end').value);
+  const duration=endSlot-startSlot;
+  const days=[...document.querySelectorAll('.pb-dow:checked')].map(cb=>parseInt(cb.value));
+  const errEl=document.getElementById('pb-err');
+  const err=msg=>{errEl.textContent=msg;errEl.classList.remove('hidden');};
+  errEl.classList.add('hidden');
+  if(!title)return err('Meeting title is required.');
+  if(!sectionId)return err('Please select a section.');
+  if(!fromDate||!toDate)return err('Date range is required.');
+  if(toDate<fromDate)return err('End date must be on or after the start date.');
+  if(!days.length)return err('Select at least one day of the week.');
+  if(duration<=0)return err('End time must be after start time.');
+  const section=DB.sections.find(s=>s.id===sectionId);
+  const dates=[];
+  let cur=new Date(fromDate+'T00:00:00'),end=new Date(toDate+'T00:00:00');
+  while(cur<=end){if(days.includes(cur.getDay()))dates.push(dStr(cur));cur.setDate(cur.getDate()+1);}
+  if(!dates.length)return err('No dates match the selected day(s) in that range.');
+  const btn=document.getElementById('pb-save');btn.disabled=true;btn.textContent=`Creating ${dates.length} slot(s)…`;
+  let created=0,skipped=0;
+  for(const date of dates){
+    try{
+      await POST('meetings',{title,type:'internal',meeting_mode:'physical',privacy:'public',date,start_slot:startSlot,duration,
+        section_id:sectionId,section_name:section?.name||'',room_id:roomId||null,no_room:!roomId,
+        created_by:U.id,created_by_name:U.name,created_by_svc:U.svc_no,is_prebooked:true});
+      created++;
+    }catch(e){skipped++;}
+  }
+  closeModal();
+  showToast(`${created} slot${created!==1?'s':''} pre-booked${skipped?` (${skipped} failed)`:''}`);
+  refreshActiveViews();
+}
+
 /* =================== MEETINGS LIST =================== */
 async function renderMeetingsList(){
   const all=await loadAllMeetings();
@@ -1706,11 +1815,12 @@ function _mcard(m){
   const myP=(m.participants||[]).find(p=>p.staff_id===U.id);
   const rsvpDot=myP?`<span class="rsvp-dot rsvp-${myP.rsvp}" style="display:inline-block"></span>`:'';
   const _isPast=new Date(m.date+'T00:00:00')<(()=>{const t=new Date();t.setHours(0,0,0,0);return t;})();
-  return`<div class="mcard${_isPast?' mcard-past':''}" onclick="viewMeetingAndLoad(${m.id})">
-    <div class="mcard-bar" style="background:${c.tx}"></div>
+  const _preB=m.is_prebooked;
+  return`<div class="mcard${_isPast?' mcard-past':''}${_preB?' mcard-prebooked':''}" onclick="viewMeetingAndLoad(${m.id})">
+    <div class="mcard-bar" style="background:${_preB?'repeating-linear-gradient(90deg,'+c.tx+' 0,'+c.tx+' 6px,transparent 6px,transparent 12px)':c.tx}"></div>
     <div class="mcard-body">
       <div class="mcard-header">
-        <div class="mcard-title">${canSee?esc(m.title):'Private meeting'}</div>
+        <div class="mcard-title">${canSee?esc(m.title):'Private meeting'}${_preB?'<span style="margin-left:6px;font-size:10px;font-weight:700;background:#f59e0b;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:middle">DRAFT</span>':''}</div>
         <span class="tag ${m.type==='external'?'tag-ext':'tag-int'}">${m.type==='internal'?'Internal':'External'}</span>
       </div>
       <div class="mcard-meta">
@@ -1739,28 +1849,20 @@ function filterMeetings(filter,btn){
   else if(filter==='upcoming')list=list.filter(m=>new Date(m.date+'T00:00:00')>=today);
   else if(filter==='past')list=list.filter(m=>new Date(m.date+'T00:00:00')<today);
 
-  if(filter==='all'||filter==='internal'||filter==='external'){
-    // Split into upcoming and past with section headers
-    const isUpcoming=m=>new Date(m.date+'T00:00:00')>=today;
-    const upcoming=list.filter(isUpcoming).sort(_sortAsc);
-    const past=list.filter(m=>!isUpcoming(m)).sort(_sortDesc);
-    if(!upcoming.length&&!past.length){container.innerHTML=empty;return;}
-    let html='';
-    if(upcoming.length){
-      html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)"><i class="ti ti-calendar-up" aria-hidden="true"></i> Upcoming</span><span style="background:var(--accent);color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 7px">${upcoming.length}</span><div style="flex:1;height:1px;background:var(--accent);opacity:.25"></div></div>`;
-      html+=upcoming.map(_mcard).join('');
-    }
-    if(past.length){
-      html+=`<div style="display:flex;align-items:center;gap:8px;margin-top:${upcoming.length?'20px':'0'};margin-bottom:10px"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)"><i class="ti ti-calendar-down" aria-hidden="true"></i> Past</span><span style="background:var(--faint);color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 7px">${past.length}</span><div style="flex:1;height:1px;background:var(--faint);opacity:.25"></div></div>`;
-      html+=past.map(_mcard).join('');
-    }
-    container.innerHTML=html;
+  if(filter==='today'){
+    list.sort(_sortAsc);
+    if(!list.length){container.innerHTML=empty;return;}
+    container.innerHTML=list.map(_mcard).join('');
     return;
   }
-  // For today / upcoming / past filters
-  if(filter==='upcoming')list.sort(_sortAsc);
-  else list.sort(_sortDesc);
-  if(!list.length){container.innerHTML=empty;return;}
+  // all / internal / external — split by the Upcoming/Past toggle
+  const isUpcoming=m=>new Date(m.date+'T00:00:00')>=today;
+  if(meetingTimeSeg==='upcoming'){
+    list=list.filter(isUpcoming).sort(_sortAsc);
+  }else{
+    list=list.filter(m=>!isUpcoming(m)).sort(_sortDesc);
+  }
+  if(!list.length){container.innerHTML=`<div class="alert a-info"><i class="ti ti-calendar-off" aria-hidden="true"></i>No ${meetingTimeSeg} meetings found.</div>`;return;}
   container.innerHTML=list.map(_mcard).join('');
 }
 async function viewMeetingAndLoad(id){
