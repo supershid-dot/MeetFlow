@@ -122,6 +122,18 @@ CREATE TABLE IF NOT EXISTS meeting_group_members (
   UNIQUE(group_id, staff_id)
 );
 
+-- ─────────────────────────── ROW LEVEL SECURITY ──────────────────
+-- This app authenticates in JavaScript using the anon key.
+-- Disable RLS on all tables so anon key requests are not blocked.
+ALTER TABLE sections             DISABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms                DISABLE ROW LEVEL SECURITY;
+ALTER TABLE staff                DISABLE ROW LEVEL SECURITY;
+ALTER TABLE meetings             DISABLE ROW LEVEL SECURITY;
+ALTER TABLE participants         DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications        DISABLE ROW LEVEL SECURITY;
+ALTER TABLE meeting_groups       DISABLE ROW LEVEL SECURITY;
+ALTER TABLE meeting_group_members DISABLE ROW LEVEL SECURITY;
+
 -- ─────────────────────────── INDEXES ──────────────────────────────
 CREATE INDEX IF NOT EXISTS meetings_date_idx           ON meetings(date);
 CREATE INDEX IF NOT EXISTS meetings_room_date_idx      ON meetings(room_id, date);
