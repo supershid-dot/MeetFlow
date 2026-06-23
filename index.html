@@ -1537,17 +1537,19 @@ async function checkPendingNotifs(){
     for(const n of pending){
       const m=meetMap[n.meeting_id];if(!m)continue;
       const msg=buildTgMsg(m,n.type,m.participants||[]);
-      // Add RSVP buttons for invitation notifications sent to actual participants
       const kb=(n.type==='invitation'&&n.participant_id)?rsvpKeyboard(n.meeting_id,n.participant_id):null;
-      const ok=await sendTg(tgToken,n.recipient_chat_id,msg,kb);
-      if(ok!==false){
-        try{await PATCH('notifications',`id=eq.${n.id}`,{status:'sent',sent_at:new Date().toISOString()});}catch(e){}
+      const msgId=await sendTg(tgToken,n.recipient_chat_id,msg,kb);
+      if(msgId!==false){
+        try{await PATCH('notifications',`id=eq.${n.id}`,{
+          status:'sent',sent_at:new Date().toISOString(),
+          telegram_message_id:msgId||null
+        });}catch(e){}
       }
     }
   }catch(e){}
 }
 
-/* =================== RSVP VIA TELEGRAM BUTTON =================== */
+/* =================== RSVP VIA TELEGRAM (BUTTON + TEXT REPLY) =================== */
 async function pollBotUpdates(){
   const tgToken=loadTgToken();if(!tgToken)return;
   const offset=parseInt(localStorage.getItem('mf_tg_offset')||'0');
@@ -1558,17 +1560,19 @@ async function pollBotUpdates(){
       localStorage.setItem('mf_tg_offset',String(upd.update_id+1));
       if(upd.callback_query?.data?.startsWith('rsvp:')){
         await handleRsvpCallback(tgToken,upd.callback_query);
+      } else if(upd.message?.text&&upd.message?.reply_to_message){
+        await handleTgTextReply(tgToken,upd.message);
       }
     }
   }catch(e){}
 }
+
 async function handleRsvpCallback(token,cq){
   const[,action,meetingId,participantId]=cq.data.split(':');
   const rsvp=action==='a'?'accepted':'declined';
   const emoji=action==='a'?'✅':'❌';
   try{
     await PATCH('participants',`id=eq.${participantId}`,{rsvp});
-    // Remove the buttons and append the staff's choice to the message
     await fetch(`https://api.telegram.org/bot${token}/editMessageText`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -1581,8 +1585,42 @@ async function handleRsvpCallback(token,cq){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({callback_query_id:cq.id,text:`${emoji} Response recorded`,show_alert:false})
     });
-    // If the meeting detail modal is open, refresh it
-    const mid=parseInt(meetingId);
+    if(!document.getElementById('tab-notif').classList.contains('hidden'))renderNotifications();
+    if(!document.getElementById('tab-calendar').classList.contains('hidden'))renderCal();
+  }catch(e){}
+}
+
+async function handleTgTextReply(token,msg){
+  const replyMsgId=msg.reply_to_message?.message_id;
+  if(!replyMsgId)return;
+  const text=(msg.text||'').toLowerCase().trim();
+  try{
+    // Match the original notification by its Telegram message_id
+    const notifs=await GET('notifications',`telegram_message_id=eq.${replyMsgId}&status=eq.sent`);
+    if(!notifs.length)return;
+    const n=notifs[0];
+    if(!n.participant_id)return;
+
+    // Detect RSVP intent from the text
+    const yes=['yes','ok','sure','accept','confirm','will be there','i will','attending','coming','affirmative'];
+    const no=["no","can't","cannot","decline","won't","not attending","can not","reject","unable","sorry"];
+    let rsvp=null;
+    if(yes.some(w=>text.includes(w)))rsvp='accepted';
+    else if(no.some(w=>text.includes(w)))rsvp='declined';
+
+    const note=msg.text; // store the original text as RSVP note
+    const patch={rsvp_note:note};
+    if(rsvp)patch.rsvp=rsvp;
+    await PATCH('participants',`id=eq.${n.participant_id}`,patch);
+
+    // Reply to the staff's message with a confirmation
+    const reply=rsvp==='accepted'?'✅ Got it — your attendance is confirmed.'
+      :rsvp==='declined'?'❌ Noted — you\'ve been marked as declined.'
+      :'💬 Your note has been saved. Use the ✅/❌ buttons to set your RSVP.';
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:msg.chat.id,text:reply,reply_to_message_id:msg.message_id})
+    });
     if(!document.getElementById('tab-notif').classList.contains('hidden'))renderNotifications();
     if(!document.getElementById('tab-calendar').classList.contains('hidden'))renderCal();
   }catch(e){}
