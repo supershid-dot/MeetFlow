@@ -758,7 +758,7 @@ function doLogout(){U=null;weekOffset=0;rmWeekOffset=0;selectedStaffId=null;sele
 function enterApp(){
   document.getElementById('who-av').textContent=initials(U.name);
   document.getElementById('who-name').textContent=staffName(U);
-  document.getElementById('who-role').textContent=(U.sections?U.sections.name:(U.role==='admin'?'admin':'')).toLowerCase();
+  document.getElementById('who-role').textContent=(U.svc_no||'').toLowerCase();
   showPage('app');
   loadAll().then(()=>{buildNav();switchTab('home');startNotifLoop();});
 }
@@ -813,7 +813,7 @@ function buildNav(){
   });
   // Sidebar footer: user info + actions
   const sbfoot=document.getElementById('sb-footer');
-  const roleLabel=(U.designation?esc(U.designation)+' · ':'')+((U.sections?U.sections.name:(U.role==='admin'?'admin':'')).toLowerCase());
+  const roleLabel=(U.designation?esc(U.designation)+' · ':'')+esc(U.svc_no||'');
   sbfoot.innerHTML=`<div class="sb-user">
     <div class="avatar" style="width:30px;height:30px;font-size:11px">${initials(U.name)}</div>
     <div class="sb-user-info"><div class="sb-user-name">${esc(staffName(U))}</div><div class="sb-user-role">${esc(roleLabel)}</div></div>
@@ -847,7 +847,7 @@ function switchTab(id){
 function buildStaffSelect(){
   const sel=document.getElementById('staff-sel');
   const others=visibleStaff().filter(s=>s.id!==U.id);
-  sel.innerHTML='<option value="">— My schedule —</option>'+others.map(s=>`<option value="${s.id}">${esc(staffName(s))}${s.sections?' · '+esc(s.sections.name):''}</option>`).join('');
+  sel.innerHTML='<option value="">— My schedule —</option>'+others.map(s=>`<option value="${s.id}">${esc(staffName(s))} · ${esc(s.svc_no||'')}</option>`).join('');
   sel.value=selectedStaffId&&selectedStaffId!==U.id?String(selectedStaffId):'';
 }
 function onStaffChange(){
@@ -968,7 +968,7 @@ async function renderCal(){
   const viewing=getViewingUser();
   const isViewingSelf=viewing.id===U.id;
   const ey=document.getElementById('cal-eyebrow');
-  ey.textContent=isViewingSelf?`${(U.sections?U.sections.name:'').toUpperCase()} · CALENDAR`:`VIEWING: ${staffName(viewing).toUpperCase()}`;
+  ey.textContent=isViewingSelf?`${(U.svc_no||'').toUpperCase()} · CALENDAR`:`VIEWING: ${staffName(viewing).toUpperCase()}`;
 
   let meetings=[];
   try{meetings=await GET('meetings',`select=*,participants(*)&date=gte.${s}&date=lte.${e}&order=start_slot.asc`);}catch(e_){console.error(e_);}
@@ -1075,7 +1075,7 @@ async function refreshDurationOptions(){
 }
 
 /* =================== NEW MEETING MODAL =================== */
-function staffOptionList(){return DB.staff.filter(s=>s.id!==U.id).map(s=>`<option value="${s.id}">${esc(s.name)} · ${s.sections?esc(s.sections.name):''}</option>`).join('');}
+function staffOptionList(){return DB.staff.filter(s=>s.id!==U.id).map(s=>`<option value="${s.id}">${esc(s.name)} · ${esc(s.svc_no||'')}</option>`).join('');}
 function groupSelectBlock(){
   const accessible=myAccessibleGroups();
   if(!accessible.length)return'';
@@ -1295,7 +1295,7 @@ function filterStaffSel(q){
   const addedIds=new Set((window._mparticipants||[]).filter(p=>p.staff_id).map(p=>p.staff_id));
   const filtered=DB.staff.filter(s=>s.id!==U.id&&!addedIds.has(s.id)&&(!q||staffName(s).toLowerCase().includes(q.toLowerCase())||(s.svc_no||'').toLowerCase().includes(q.toLowerCase())));
   sel.innerHTML=filtered.length
-    ?filtered.map(s=>`<option value="${s.id}">${esc(staffName(s))} · ${s.sections?esc(s.sections.name):''}</option>`).join('')
+    ?filtered.map(s=>`<option value="${s.id}">${esc(staffName(s))} · ${esc(s.svc_no||'')}</option>`).join('')
     :'<option value="" disabled>No staff found</option>';
 }
 function renderParticipantList(){
@@ -2294,9 +2294,9 @@ function openModal(type,id){
         <div class="field"><label>Group name</label><input id="g-name" placeholder="e.g. Senior Management"/></div>
         <div class="field"><label>Description (optional)</label><input id="g-desc" placeholder="e.g. SMT weekly meeting attendees"/></div>
         <div class="section-title" style="margin-top:4px">Members <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(participants added to meetings)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
         <div class="section-title" style="margin-top:8px">Who can use this group <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(can select group when scheduling)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveGroup()">Create group</button></div>`);
   } else if(type==='edit-group'){
@@ -2307,9 +2307,9 @@ function openModal(type,id){
         <div class="field"><label>Group name</label><input id="g-name" value="${esc(g.name)}"/></div>
         <div class="field"><label>Description</label><input id="g-desc" value="${esc(g.description||'')}"/></div>
         <div class="section-title" style="margin-top:4px">Members <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(participants added to meetings)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"${memIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"${memIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
         <div class="section-title" style="margin-top:8px">Who can use this group <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(can select group when scheduling)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"${usrIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"${usrIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="updateGroup(${id})">Save</button></div>`);
   } else if(type==='add-staff'){
