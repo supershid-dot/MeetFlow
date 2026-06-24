@@ -655,7 +655,7 @@ function resetConfig(){localStorage.removeItem('sb_url');localStorage.removeItem
 
 /* =================== STATE =================== */
 let U=null,weekOffset=0,rmWeekOffset=0,selectedStaffId=null,selectedDayIdx=null,rmDayIdx=null,selectedRoomId=null;
-let DB={sections:[],rooms:[],staff:[],groups:[],meetings:[]};
+let DB={sections:[],rooms:[],staff:[],groups:[],meetings:[],staff_sections:[]};
 let allMeetingsCache=[],meetingFilter='all',meetingTimeSeg='upcoming';
 
 function showPage(p){['config','loading','login','newpwd','app'].forEach(x=>document.getElementById(x+'-page').classList.add('hidden'));document.getElementById(p+'-page').classList.remove('hidden');}
@@ -663,16 +663,31 @@ function showPage(p){['config','loading','login','newpwd','app'].forEach(x=>docu
 /* =================== PERMISSIONS =================== */
 function canViewAll(){return U.role==='admin'||!!U.can_view_all;}
 function canUseGroups(){return U.role==='admin'||!!U.can_create_groups;}
+/* Returns a Set of section IDs the current user can view and manage. */
+function myAccessibleSecIds(){
+  if(U.role==='admin')return new Set(DB.sections.map(s=>s.id));
+  const ids=new Set();
+  if(U.section_id)ids.add(U.section_id);
+  (DB.staff_sections||[]).filter(ss=>ss.staff_id===U.id).forEach(ss=>ids.add(ss.section_id));
+  return ids;
+}
 function visibleStaff(){
   if(canViewAll())return DB.staff;
-  return DB.staff.filter(s=>s.id===U.id||(U.section_id&&s.section_id===U.section_id));
+  const mySecIds=myAccessibleSecIds();
+  return DB.staff.filter(s=>{
+    if(s.id===U.id)return true;
+    if(mySecIds.has(s.section_id))return true;
+    // a supervisor whose extra sections include one of mine should also be visible
+    return (DB.staff_sections||[]).some(ss=>ss.staff_id===s.id&&mySecIds.has(ss.section_id));
+  });
 }
-/* Creator OR same-section staff OR admin can manage a meeting. */
+/* Creator OR staff in an accessible section OR admin can manage a meeting. */
 function canManage(m){
   if(U.role==='admin')return true;
   if(m.created_by===U.id)return true;
-  if(U.section_id&&m.section_id&&U.section_id===m.section_id)return true;
-  if(U.sections&&m.section_name&&U.sections.name===m.section_name)return true;
+  const secIds=myAccessibleSecIds();
+  if(m.section_id&&secIds.has(m.section_id))return true;
+  if(m.section_name){const sec=DB.sections.find(s=>s.name===m.section_name);if(sec&&secIds.has(sec.id))return true;}
   return false;
 }
 
@@ -732,6 +747,7 @@ async function loadAll(){
   try{DB.room_blocks=await GET('room_blocks','select=*&order=date_from.asc');}catch(e){DB.room_blocks=[];}
   try{DB.leaves=await GET('staff_leaves','select=*&order=date_from.asc');}catch(e){DB.leaves=[];}
   try{const cfg=await GET('app_config','select=*');DB.config={};cfg.forEach(r=>{DB.config[r.key]=r.value;});}catch(e){DB.config={};}
+  try{DB.staff_sections=await GET('staff_sections','select=*');}catch(e){DB.staff_sections=[];}
   if(selectedStaffId==null)selectedStaffId=U.id;
   if(selectedRoomId==null&&DB.rooms.length)selectedRoomId=DB.rooms[0].id;
 }
@@ -1045,6 +1061,11 @@ function openNewMeetingModal(preDate,preSlot,preRoomId){
   const preS=preSlot==null?CAL_START*4:preSlot; // default = admin-set start hour
   window._editMeetingId=null;window._mtype='internal';window._mprivacy='public';window._mmode='physical';window._mnoroom=false;window._mrecur='';
   window._mparticipants=[{staff_id:U.id,name:staffName(U),email:U.email||'',is_external:false,rsvp:'accepted'}];
+  const mySecIds=myAccessibleSecIds();
+  const mySections=DB.sections.filter(s=>mySecIds.has(s.id));
+  const sectionPickerHtml=mySections.length>1
+    ?`<div class="field"><label>On behalf of section</label><select id="nm-sec-id">${mySections.map(s=>`<option value="${s.id}"${s.id===U.section_id?' selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`
+    :'';
 
   showBigModal(`
   <div class="modal-head"><div class="modal-title">Schedule meeting</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
@@ -1052,6 +1073,7 @@ function openNewMeetingModal(preDate,preSlot,preRoomId){
     <div class="vm-grid">
       <div class="vm-left">
         <div class="field"><label>Title</label><input id="nm-title" placeholder="e.g. Q3 Review"/></div>
+        ${sectionPickerHtml}
         <div>
           <div class="section-title">Meeting type</div>
           <div class="pill-group">
@@ -1302,7 +1324,7 @@ async function saveMeeting(){
   try{
     const mRows=await POST('meetings',{
       title,type,meeting_mode:mode,meeting_link,privacy:window._mprivacy||'public',date,start_slot,duration,notes,location,no_room,
-      room_id:room_id||null,section_id:U.section_id||null,section_name:U.sections?U.sections.name:null,
+      room_id:room_id||null,section_id:(()=>{const el=document.getElementById('nm-sec-id');return el?parseInt(el.value)||null:U.section_id||null;})(),section_name:(()=>{const el=document.getElementById('nm-sec-id');if(el){const sec=DB.sections.find(s=>s.id===parseInt(el.value));return sec?sec.name:null;}return U.sections?U.sections.name:null;})(),
       created_by:U.id,created_by_name:staffName(U),created_by_svc:U.svc_no
     });
     const mRow=Array.isArray(mRows)?mRows[0]:mRows;
@@ -1681,7 +1703,7 @@ function buildTgMsg(m,type,allParts,extra){
   const by=creatorStaff?staffName(creatorStaff):esc(m.created_by_name||'');
   const extraLine=extra?`\n\n${esc(extra)}`:'';
   if(type==='reminder')
-    return `⏰ <b>${esc(m.title)}</b>\n\n🗓 ${dateStr}\n⏱ ${timeStr}${placeLine}${attendeesLine}\n\nStarts in 30 minutes.`;
+    return `⏰ <b>${esc(m.title)}</b>\n\n🗓 ${dateStr}\n⏱ ${timeStr}${placeLine}${attendeesLine}\n\nMeeting starts at ${fTime(m.start_slot)}.`;
   if(type==='cancellation')
     return `❌ <b>${esc(m.title)}</b>\n\n🗓 ${dateStr}\n⏱ ${timeStr}${extraLine}\n\n— ${by}`;
   if(type==='update')
@@ -2215,6 +2237,11 @@ function openModal(type,id){
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveStaff()">Create</button></div>`);
   } else if(type==='edit-staff'){
     const s=DB.staff.find(x=>x.svc_no===id);
+    const extraSecIds=new Set((DB.staff_sections||[]).filter(ss=>ss.staff_id===s.id).map(ss=>ss.section_id));
+    const otherSections=DB.sections.filter(sec=>sec.id!==s.section_id);
+    const extraSecHtml=otherSections.length
+      ?otherSections.map(sec=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 0"><input type="checkbox" class="ss-extra" value="${sec.id}"${extraSecIds.has(sec.id)?' checked':''}/>${esc(sec.name)}</label>`).join('')
+      :'<span style="color:var(--faint);font-size:12px">No other sections defined</span>';
     showModal(`<div class="modal-head"><div class="modal-title">Edit staff</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
       <div class="modal-body"><div class="stack">
         <div class="field"><label>Service no.</label><input readonly value="${s.svc_no}"/></div>
@@ -2225,7 +2252,8 @@ function openModal(type,id){
         </div>
         <div class="field"><label>Email</label><input type="email" id="m-em" value="${esc(s.email||'')}"/></div>
         <div class="field"><label>Telegram Chat ID</label><input id="m-tg" value="${esc(s.telegram_chat_id||'')}" placeholder="e.g. 123456789"/></div>
-        <div class="field"><label>Section</label><select id="m-ss">${DB.sections.map(sec=>`<option value="${sec.id}"${sec.id===s.section_id?' selected':''}>${esc(sec.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>Primary section</label><select id="m-ss">${DB.sections.map(sec=>`<option value="${sec.id}"${sec.id===s.section_id?' selected':''}>${esc(sec.name)}</option>`).join('')}</select></div>
+        <div><div class="section-title">Also manages sections <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--faint)">(can view &amp; manage meetings)</span></div>${extraSecHtml}</div>
         <label class="toggle-row"><input type="checkbox" id="m-admin"${s.role==='admin'?' checked':''}/><span>Admin access</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-viewall"${s.can_view_all?' checked':''}/><span>Can view everyone's schedule</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-groups"${s.can_create_groups?' checked':''}/><span>Can create &amp; use group meetings</span></label>
@@ -2308,8 +2336,14 @@ async function updateStaff(svc_no){
   const role=document.getElementById('m-admin').checked?'admin':'staff';
   const can_view_all=document.getElementById('m-viewall').checked;
   const can_create_groups=document.getElementById('m-groups').checked;
+  const extraSecIds=Array.from(document.querySelectorAll('.ss-extra:checked')).map(c=>parseInt(c.value));
   try{
     await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc_no),{name,rank_short,designation,email,telegram_chat_id,section_id,role,can_view_all,can_create_groups});
+    const staffRow=DB.staff.find(s=>s.svc_no===svc_no);
+    if(staffRow){
+      try{await DEL('staff_sections','staff_id=eq.'+staffRow.id);}catch(e){}
+      if(extraSecIds.length)await Promise.all(extraSecIds.map(sid=>POST('staff_sections',{staff_id:staffRow.id,section_id:sid})));
+    }
     if(U.svc_no===svc_no){U.can_view_all=can_view_all;U.can_create_groups=can_create_groups;U.role=role;}
     await loadAll();closeModal();renderAdmin();showToast('Staff updated');
   }catch(e){alert(e.message);}
