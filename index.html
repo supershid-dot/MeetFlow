@@ -214,8 +214,8 @@ tbody tr:hover td{background:var(--panel2)}
 .wg-slot:hover .wg-plus{opacity:1}
 
 /* PARTICIPANT ROW */
-.prow{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
-.prow-main{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
+.prow{display:flex;align-items:center;flex-wrap:nowrap;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+.prow-main{display:flex;align-items:center;gap:9px;flex:1;min-width:0;overflow:hidden}
 .prow-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
 .prow-name{font-weight:600;font-size:13px;flex:1}
 .prow-role{font-size:11px;color:var(--dim)}
@@ -230,8 +230,8 @@ tbody tr:hover td{background:var(--panel2)}
 .rsvp-pending{background:var(--warn)}
 
 /* ATTENDANCE */
-.att-seg{display:flex;gap:6px;flex-shrink:0}
-.att-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;font-size:15px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);color:var(--dim);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.att-seg{display:flex;gap:6px;flex-shrink:0;flex-wrap:nowrap}
+.att-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;min-width:34px;max-width:34px;height:34px;font-size:15px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);color:var(--dim);cursor:pointer;transition:background .15s,color .15s,border-color .15s;flex-shrink:0}
 .att-btn:hover{border-color:var(--accent);color:var(--text)}
 .att-btn.on-present{background:var(--good-bg);color:var(--good-ink);border-color:var(--good-ink)}
 .att-btn.on-absent{background:var(--bad-bg);color:var(--bad-ink);border-color:var(--bad-ink)}
