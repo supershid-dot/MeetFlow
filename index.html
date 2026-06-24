@@ -197,13 +197,13 @@ tbody tr:hover td{background:var(--panel2)}
 .wg-dd{font-size:15px;font-weight:700;margin-top:1px}
 .wg-dh.today{background:var(--accent-bg)}
 .wg-dh.today .wg-dn,.wg-dh.today .wg-dd{color:var(--accent-ink)}
-.wg-tl{background:var(--panel2);border-right:1px solid var(--line);border-bottom:1px solid var(--line2);height:18px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;color:var(--faint)}
-.wg-slot{height:18px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);position:relative;cursor:pointer;transition:background var(--ease)}
+.wg-tl{background:var(--panel2);border-right:1px solid var(--line);border-bottom:1px solid var(--line2);height:36px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;color:var(--faint)}
+.wg-slot{height:36px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);position:relative;cursor:pointer;transition:background var(--ease)}
 .wg-slot:hover{background:var(--panel2)}
 .wg-slot.past{opacity:.32;pointer-events:none}
 .wg-slot.hourline{border-bottom-color:var(--line)}
-.wg-slot.halfhour{border-bottom-color:var(--line)}
-.wg-tl.half{opacity:.55;font-size:8px}
+.wg-slot.halfhour{border-bottom-color:var(--line2)}
+.wg-tl.half{color:var(--dim)}
 .wg-block{position:absolute;inset:1px;border-radius:4px;padding:2px 5px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
 .wg-block-title{font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
 .wg-block-sub{font-size:9px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
@@ -872,18 +872,17 @@ function buildWeekGrid(gridEl,dates,today,meetings,opts){
     if(i===6)h.style.borderRight='none';
     h.innerHTML=`<div class="wg-dn">${DN[d.getDay()]}</div><div class="wg-dd">${d.getDate()}</div>`;gridEl.appendChild(h);
   });
-  for(let s=CAL_START*4;s<CAL_END*4;s++){
-    const hourline=s%4===3;
-    const halfhour=s%2===1&&!hourline;
-    const isLast=s===CAL_END*4-1;
-    const tl=document.createElement('div');tl.className='wg-tl'+(s%4!==0&&s%2===0?' half':'');if(isLast)tl.style.borderBottom='none';tl.textContent=s%2===0?fTime(s):'';gridEl.appendChild(tl);
+  for(let s=CAL_START*4;s<CAL_END*4;s+=2){
+    const hourline=s%4===2;
+    const isLast=s>=CAL_END*4-2;
+    const tl=document.createElement('div');tl.className='wg-tl'+(s%4!==0?' half':'');if(isLast)tl.style.borderBottom='none';tl.textContent=fTime(s);gridEl.appendChild(tl);
     dates.forEach((d,di)=>{
-      const cell=document.createElement('div');cell.className='wg-slot'+(hourline?' hourline':halfhour?' halfhour':'');
+      const cell=document.createElement('div');cell.className='wg-slot'+(hourline?' hourline':'');
       const isPast=d<today;if(isLast)cell.style.borderBottom='none';if(di===6)cell.style.borderRight='none';
       if(isPast)cell.classList.add('past');
       const ds=dStr(d);
-      const bks=meetings.filter(m=>m.date===ds&&s>=m.start_slot&&s<m.start_slot+m.duration);
-      const newMs=bks.filter(m=>m.start_slot===s);
+      const bks=meetings.filter(m=>m.date===ds&&s<m.start_slot+m.duration&&s+2>m.start_slot);
+      const newMs=bks.filter(m=>m.start_slot>=s&&m.start_slot<s+2);
       if(newMs.length>0){
         const m=newMs[0];const c=meetingColor(m);const canSee=canSeeMeetingDetails(m);
         cell.style.background=c.bg;
