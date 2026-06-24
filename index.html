@@ -214,7 +214,8 @@ tbody tr:hover td{background:var(--panel2)}
 .wg-slot:hover .wg-plus{opacity:1}
 
 /* PARTICIPANT ROW */
-.prow{display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+.prow{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+.prow-main{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
 .prow-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
 .prow-name{font-weight:600;font-size:13px;flex:1}
 .prow-role{font-size:11px;color:var(--dim)}
@@ -229,11 +230,12 @@ tbody tr:hover td{background:var(--panel2)}
 .rsvp-pending{background:var(--warn)}
 
 /* ATTENDANCE */
-.att-seg{display:flex;gap:4px;flex-shrink:0}
-.att-btn{padding:3px 8px;font-size:10.5px;font-weight:700;border-radius:6px;border:1px solid var(--line);background:var(--panel)}
-.att-btn.on-present{background:var(--good-bg);color:var(--good-ink);border-color:transparent}
-.att-btn.on-absent{background:var(--bad-bg);color:var(--bad-ink);border-color:transparent}
-.att-btn.on-late{background:var(--warn-bg);color:var(--warn-ink);border-color:transparent}
+.att-seg{display:flex;gap:6px;flex-shrink:0}
+.att-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;font-size:12px;font-weight:600;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);color:var(--dim);cursor:pointer;transition:background .15s,color .15s,border-color .15s;white-space:nowrap}
+.att-btn:hover{border-color:var(--accent);color:var(--text)}
+.att-btn.on-present{background:var(--good-bg);color:var(--good-ink);border-color:var(--good-ink)}
+.att-btn.on-absent{background:var(--bad-bg);color:var(--bad-ink);border-color:var(--bad-ink)}
+@media(max-width:540px){.prow{flex-wrap:wrap}.att-seg{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}.att-btn{justify-content:center;padding:10px 8px;font-size:13px}}
 
 /* GROUP CHIP */
 .grp-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:100px;background:var(--accent-bg);color:var(--accent-ink);font-size:12px;font-weight:600;border:1px solid var(--line)}
@@ -1283,8 +1285,10 @@ function renderParticipantList(){
     const isSelf=p.staff_id===U.id;
     const _ps=p.staff_id?DB.staff.find(x=>x.id===p.staff_id):null;const _pn=_ps?staffName(_ps):p.name;
     return`<div class="prow">
-      <div class="prow-avatar" style="background:${p.is_external?'var(--ext-bg)':'var(--accent-bg)'};color:${p.is_external?'var(--ext-ink)':'var(--accent-ink)'}">${initials(_pn)}</div>
-      <div style="flex:1;min-width:0"><div class="prow-name">${esc(_pn)}</div><div class="prow-role">${p.is_external?'External guest':(p.onLeave?'<span style="color:var(--warn-ink)">🏖 On '+esc(p.onLeave.leave_type)+'</span>':(p.busy?'<span style="color:var(--warn-ink)">⚠ Busy at this time</span>':''))}</div></div>
+      <div class="prow-main">
+        <div class="prow-avatar" style="background:${p.is_external?'var(--ext-bg)':'var(--accent-bg)'};color:${p.is_external?'var(--ext-ink)':'var(--accent-ink)'}">${initials(_pn)}</div>
+        <div style="min-width:0"><div class="prow-name">${esc(_pn)}</div><div class="prow-role">${p.is_external?'External guest':(p.onLeave?'<span style="color:var(--warn-ink)">🏖 On '+esc(p.onLeave.leave_type)+'</span>':(p.busy?'<span style="color:var(--warn-ink)">⚠ Busy at this time</span>':''))}</div></div>
+      </div>
       ${p.rsvp==='accepted'&&isSelf?'<span class="badge b-good">You</span>':''}
       ${!isSelf?`<button class="prow-rm" onclick="removeParticipant(${i})"><i class="ti ti-x" aria-hidden="true"></i></button>`:''}
     </div>`;
@@ -1412,13 +1416,14 @@ function viewMeetingModal(m){
           const lv=!p.is_external&&p.staff_id?staffOnLeave(p.staff_id,m.date):null;
           const _vs=p.staff_id?DB.staff.find(x=>x.id===p.staff_id):null;const _vn=_vs?staffName(_vs):p.name;
           return`<div class="prow">
-          <div class="prow-avatar" style="background:${p.is_external?'var(--ext-bg)':'var(--accent-bg)'};color:${p.is_external?'var(--ext-ink)':'var(--accent-ink)'}">${initials(_vn)}</div>
-          <div style="flex:1;min-width:0"><div class="prow-name">${esc(_vn)}</div><div class="prow-role"><span class="rsvp-dot rsvp-${p.rsvp}" style="display:inline-block;margin-right:4px"></span>${p.rsvp}${p.rsvp_note?' · '+esc(p.rsvp_note):''}${lv?' · <span style="color:var(--warn-ink)">🏖 '+esc(lv.leave_type)+'</span>':''}</div></div>
+          <div class="prow-main">
+            <div class="prow-avatar" style="background:${p.is_external?'var(--ext-bg)':'var(--accent-bg)'};color:${p.is_external?'var(--ext-ink)':'var(--accent-ink)'}">${initials(_vn)}</div>
+            <div style="min-width:0"><div class="prow-name">${esc(_vn)}</div><div class="prow-role"><span class="rsvp-dot rsvp-${p.rsvp}" style="display:inline-block;margin-right:4px"></span>${p.rsvp}${p.rsvp_note?' · '+esc(p.rsvp_note):''}${lv?' · <span style="color:var(--warn-ink)">🏖 '+esc(lv.leave_type)+'</span>':''}</div></div>
+          </div>
           ${canMarkAttendance?`<div class="att-seg">
-            <button class="att-btn ${att==='present'?'on-present':''}" title="Present" onclick="markAttendance(${p.id},'present',${m.id})">P</button>
-            <button class="att-btn ${att==='late'?'on-late':''}" title="Late" onclick="markAttendance(${p.id},'late',${m.id})">L</button>
-            <button class="att-btn ${att==='absent'?'on-absent':''}" title="Absent" onclick="markAttendance(${p.id},'absent',${m.id})">A</button>
-          </div>`:(att?`<span class="badge ${att==='present'?'b-good':att==='late'?'b-warn':'b-bad'}">${att}</span>`:'')}
+            <button class="att-btn ${att==='present'?'on-present':''}" data-pid="${p.id}" data-status="present" onclick="markAttendance(${p.id},'present',${m.id},'${att||''}')"><i class="ti ti-check" aria-hidden="true"></i> Present</button>
+            <button class="att-btn ${att==='absent'?'on-absent':''}" data-pid="${p.id}" data-status="absent" onclick="markAttendance(${p.id},'absent',${m.id},'${att||''}')"><i class="ti ti-x" aria-hidden="true"></i> Absent</button>
+          </div>`:(att?`<span class="badge ${att==='present'?'b-good':'b-bad'}" style="flex-shrink:0">${att==='present'?'✓ Present':'✗ Absent'}</span>`:'')}
         </div>`;}).join('')}
         </div>`:'<div class="alert a-warn"><i class="ti ti-eye-off" aria-hidden="true"></i>Details are private — only visible to participants.</div>'}
         ${myRsvp&&myRsvp.rsvp==='pending'?`
@@ -1519,13 +1524,18 @@ function viewMeetingModal(m){
   </div>`);
 }
 
-async function markAttendance(pid,status,meetingId){
+async function markAttendance(pid,status,meetingId,currentAtt){
+  const newStatus=currentAtt===status?null:status;
+  /* Optimistic update — no full modal refresh */
+  document.querySelectorAll(`[data-pid="${pid}"]`).forEach(b=>b.classList.remove('on-present','on-absent'));
+  if(newStatus){const ab=document.querySelector(`[data-pid="${pid}"][data-status="${newStatus}"]`);if(ab)ab.classList.add('on-'+newStatus);}
   try{
-    await PATCH('participants',`id=eq.${pid}`,{attendance:status,attendance_marked_by:U.id,attendance_marked_at:new Date().toISOString()});
-    showToast('Attendance: '+status);
+    await PATCH('participants',`id=eq.${pid}`,{attendance:newStatus,attendance_marked_by:newStatus?U.id:null,attendance_marked_at:newStatus?new Date().toISOString():null});
+  }catch(e){
+    alert(e.message);
     const rows=await GET('meetings',`select=*,participants(*)&id=eq.${meetingId}`);
     if(rows[0])viewMeetingModal(rows[0]);
-  }catch(e){alert(e.message);}
+  }
 }
 
 async function rsvp(meetingId,response){
