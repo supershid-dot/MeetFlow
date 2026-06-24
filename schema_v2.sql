@@ -130,6 +130,16 @@ CREATE TABLE IF NOT EXISTS meeting_group_members (
   UNIQUE(group_id, staff_id)
 );
 
+-- Per-group access: which staff can select this group when scheduling
+CREATE TABLE IF NOT EXISTS meeting_group_access (
+  group_id integer REFERENCES meeting_groups(id) ON DELETE CASCADE,
+  staff_id integer REFERENCES staff(id)          ON DELETE CASCADE,
+  PRIMARY KEY (group_id, staff_id)
+);
+ALTER TABLE meeting_group_access DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS grp_access_group_idx ON meeting_group_access(group_id);
+CREATE INDEX IF NOT EXISTS grp_access_staff_idx ON meeting_group_access(staff_id);
+
 -- ─────────────────────────── ROW LEVEL SECURITY ──────────────────
 -- This app authenticates in JavaScript using the anon key.
 -- Disable RLS on all tables so anon key requests are not blocked.

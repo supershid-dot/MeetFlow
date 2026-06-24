@@ -543,7 +543,7 @@ tbody tr:hover td{background:var(--panel2)}
       </div>
       <div class="panel" style="margin-bottom:14px">
         <div class="panel-head"><div class="panel-title"><i class="ti ti-users-group" aria-hidden="true"></i>Meeting Groups</div><button class="btn btn-accent btn-sm" onclick="openModal('add-group')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
-        <div class="tbl-wrap"><table><thead><tr><th>Group</th><th>Members</th><th>Actions</th></tr></thead><tbody id="groups-tbody"></tbody></table></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Group</th><th>Members</th><th>Can use</th><th>Actions</th></tr></thead><tbody id="groups-tbody"></tbody></table></div>
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title"><i class="ti ti-users" aria-hidden="true"></i>Staff</div><button class="btn btn-accent btn-sm" onclick="openModal('add-staff')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
@@ -662,7 +662,8 @@ function showPage(p){['config','loading','login','newpwd','app'].forEach(x=>docu
 
 /* =================== PERMISSIONS =================== */
 function canViewAll(){return U.role==='admin'||!!U.can_view_all;}
-function canUseGroups(){return U.role==='admin'||!!U.can_create_groups;}
+function canUseGroups(){return U.role==='admin'||DB.groups.some(g=>(g.meeting_group_access||[]).some(a=>a.staff_id===U.id));}
+function myAccessibleGroups(){if(U.role==='admin')return DB.groups;return DB.groups.filter(g=>(g.meeting_group_access||[]).some(a=>a.staff_id===U.id));}
 /* Returns a Set of section IDs the current user can view and manage. */
 function myAccessibleSecIds(){
   if(U.role==='admin')return new Set(DB.sections.map(s=>s.id));
@@ -743,7 +744,7 @@ async function loadAll(){
   ]);
   DB.sections=secs;DB.rooms=rooms;DB.staff=staff;
   secs.forEach(s=>getSC(s.name));
-  try{DB.groups=await GET('meeting_groups','select=*,meeting_group_members(staff_id)&order=name.asc');}catch(e){DB.groups=[];}
+  try{DB.groups=await GET('meeting_groups','select=*,meeting_group_members(staff_id),meeting_group_access(staff_id)&order=name.asc');}catch(e){DB.groups=[];}
   try{DB.room_blocks=await GET('room_blocks','select=*&order=date_from.asc');}catch(e){DB.room_blocks=[];}
   try{DB.leaves=await GET('staff_leaves','select=*&order=date_from.asc');}catch(e){DB.leaves=[];}
   try{const cfg=await GET('app_config','select=*');DB.config={};cfg.forEach(r=>{DB.config[r.key]=r.value;});}catch(e){DB.config={};}
@@ -1048,10 +1049,11 @@ async function refreshDurationOptions(){
 /* =================== NEW MEETING MODAL =================== */
 function staffOptionList(){return DB.staff.filter(s=>s.id!==U.id).map(s=>`<option value="${s.id}">${esc(s.name)} · ${s.sections?esc(s.sections.name):''}</option>`).join('');}
 function groupSelectBlock(){
-  if(!canUseGroups()||!DB.groups.length)return'';
+  const accessible=myAccessibleGroups();
+  if(!accessible.length)return'';
   return`<div class="section-title" style="margin-top:10px">Add a group</div>
     <div class="r2">
-      <div class="field"><label>Group</label><select id="nm-add-group"><option value="">— select group —</option>${DB.groups.map(g=>`<option value="${g.id}">${esc(g.name)} (${(g.meeting_group_members||[]).length})</option>`).join('')}</select></div>
+      <div class="field"><label>Group</label><select id="nm-add-group"><option value="">— select group —</option>${accessible.map(g=>`<option value="${g.id}">${esc(g.name)} (${(g.meeting_group_members||[]).length})</option>`).join('')}</select></div>
       <div style="display:flex;align-items:flex-end"><button class="btn btn-sm" onclick="addGroupParticipants()"><i class="ti ti-users-plus" aria-hidden="true"></i>Add group</button></div>
     </div>`;
 }
@@ -2141,17 +2143,20 @@ async function renderAdmin(){
 
   document.getElementById('groups-tbody').innerHTML=DB.groups.map(g=>{
     const n=(g.meeting_group_members||[]).length;
+    const accessIds=(g.meeting_group_access||[]).map(a=>a.staff_id);
+    const accessNames=DB.staff.filter(s=>accessIds.includes(s.id)).map(s=>esc(staffName(s))).join(', ')||'<span style="color:var(--faint)">—</span>';
     return`<tr><td style="font-weight:600">${esc(g.name)}${g.description?`<div style="font-size:11px;color:var(--dim);font-weight:400">${esc(g.description)}</div>`:''}</td>
     <td><span class="badge b-accent">${n} member${n===1?'':'s'}</span></td>
+    <td style="font-size:12px;color:var(--dim)">${accessNames}</td>
     <td><div class="acts">
-      <button class="btn btn-sm" onclick="openModal('edit-group',${g.id})"><i class="ti ti-users" aria-hidden="true"></i>Members</button>
+      <button class="btn btn-sm" onclick="openModal('edit-group',${g.id})"><i class="ti ti-users" aria-hidden="true"></i>Edit</button>
       <button class="btn btn-danger btn-icon" onclick="delGroup(${g.id})"><i class="ti ti-trash" aria-hidden="true"></i></button>
     </div></td></tr>`;
-  }).join('')||'<tr><td colspan="3" style="color:var(--faint);text-align:center;padding:12px">No groups yet</td></tr>';
+  }).join('')||'<tr><td colspan="4" style="color:var(--faint);text-align:center;padding:12px">No groups yet</td></tr>';
 
   document.getElementById('staff-tbody').innerHTML=DB.staff.filter(s=>s.svc_no!=='SVC000').map(s=>{
     const c=getSC(s.sections?s.sections.name:null);
-    const access=[s.can_view_all?'<span class="badge b-accent" title="Can view all schedules">All cal</span>':'',s.can_create_groups?'<span class="badge b-accent" title="Can create group meetings">Groups</span>':''].filter(Boolean).join(' ')||'<span style="color:var(--faint)">—</span>';
+    const access=s.can_view_all?'<span class="badge b-accent" title="Can view all schedules">All cal</span>':'<span style="color:var(--faint)">—</span>';
     const tgBadge=s.telegram_chat_id?'<span class="badge b-good" title="Telegram linked"><i class="ti ti-brand-telegram"></i> Linked</span>':'<span style="color:var(--faint);font-size:11px">—</span>';
     return`<tr>
       <td class="mono">${s.svc_no}</td>
@@ -2199,22 +2204,28 @@ function openModal(type,id){
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveRoom(${id})">Save</button></div>`);
   } else if(type==='add-group'){
+    const staffList=DB.staff.filter(s=>s.svc_no!=='SVC000');
     showModal(`<div class="modal-head"><div class="modal-title">Add meeting group</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
       <div class="modal-body"><div class="stack">
         <div class="field"><label>Group name</label><input id="g-name" placeholder="e.g. Senior Management"/></div>
         <div class="field"><label>Description (optional)</label><input id="g-desc" placeholder="e.g. SMT weekly meeting attendees"/></div>
-        <div class="section-title" style="margin-top:4px">Members</div>
-        <div class="chk-list">${DB.staff.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"/>${esc(s.name)} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="section-title" style="margin-top:4px">Members <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(participants added to meetings)</span></div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="section-title" style="margin-top:8px">Who can use this group <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(can select group when scheduling)</span></div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveGroup()">Create group</button></div>`);
   } else if(type==='edit-group'){
-    const g=DB.groups.find(x=>x.id===id);const memIds=(g.meeting_group_members||[]).map(m=>m.staff_id);
+    const g=DB.groups.find(x=>x.id===id);const memIds=(g.meeting_group_members||[]).map(m=>m.staff_id);const usrIds=(g.meeting_group_access||[]).map(a=>a.staff_id);
+    const staffList=DB.staff.filter(s=>s.svc_no!=='SVC000');
     showModal(`<div class="modal-head"><div class="modal-title">Edit group</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
       <div class="modal-body"><div class="stack">
         <div class="field"><label>Group name</label><input id="g-name" value="${esc(g.name)}"/></div>
         <div class="field"><label>Description</label><input id="g-desc" value="${esc(g.description||'')}"/></div>
-        <div class="section-title" style="margin-top:4px">Members</div>
-        <div class="chk-list">${DB.staff.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"${memIds.includes(s.id)?' checked':''}/>${esc(s.name)} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="section-title" style="margin-top:4px">Members <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(participants added to meetings)</span></div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"${memIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
+        <div class="section-title" style="margin-top:8px">Who can use this group <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(can select group when scheduling)</span></div>
+        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"${usrIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${s.sections?esc(s.sections.name):'—'}</label>`).join('')}</div>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="updateGroup(${id})">Save</button></div>`);
   } else if(type==='add-staff'){
@@ -2232,7 +2243,6 @@ function openModal(type,id){
         <div class="field"><label>Section</label><select id="m-ss">${DB.sections.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
         <label class="toggle-row"><input type="checkbox" id="m-admin"/><span>Grant admin access</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-viewall"/><span>Can view everyone's schedule</span></label>
-        <label class="toggle-row"><input type="checkbox" id="m-groups"/><span>Can create &amp; use group meetings</span></label>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveStaff()">Create</button></div>`);
   } else if(type==='edit-staff'){
@@ -2256,7 +2266,6 @@ function openModal(type,id){
         <div><div class="section-title">Also manages sections <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--faint)">(can view &amp; manage meetings)</span></div>${extraSecHtml}</div>
         <label class="toggle-row"><input type="checkbox" id="m-admin"${s.role==='admin'?' checked':''}/><span>Admin access</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-viewall"${s.can_view_all?' checked':''}/><span>Can view everyone's schedule</span></label>
-        <label class="toggle-row"><input type="checkbox" id="m-groups"${s.can_create_groups?' checked':''}/><span>Can create &amp; use group meetings</span></label>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="updateStaff('${s.svc_no}')">Save</button></div>`);
   } else if(type==='reset-pwd'){
@@ -2294,7 +2303,9 @@ async function saveGroup(){
     const rows=await POST('meeting_groups',{name,description,created_by:U.id});
     const g=Array.isArray(rows)?rows[0]:rows;
     const ids=selectedGroupMemberIds();
+    const usrIds=Array.from(document.querySelectorAll('.g-usr:checked')).map(c=>parseInt(c.value));
     if(ids.length)await Promise.all(ids.map(sid=>POST('meeting_group_members',{group_id:g.id,staff_id:sid})));
+    if(usrIds.length)await Promise.all(usrIds.map(uid=>POST('meeting_group_access',{group_id:g.id,staff_id:uid})));
     await loadAll();closeModal();renderAdmin();showToast('Group created');
   }catch(e){alert(e.message);}
 }
@@ -2306,7 +2317,10 @@ async function updateGroup(id){
     await PATCH('meeting_groups','id=eq.'+id,{name,description});
     await DEL('meeting_group_members','group_id=eq.'+id);
     const ids=selectedGroupMemberIds();
+    const usrIds=Array.from(document.querySelectorAll('.g-usr:checked')).map(c=>parseInt(c.value));
     if(ids.length)await Promise.all(ids.map(sid=>POST('meeting_group_members',{group_id:id,staff_id:sid})));
+    await DEL('meeting_group_access','group_id=eq.'+id);
+    if(usrIds.length)await Promise.all(usrIds.map(uid=>POST('meeting_group_access',{group_id:id,staff_id:uid})));
     await loadAll();closeModal();renderAdmin();showToast('Group updated');
   }catch(e){alert(e.message);}
 }
@@ -2321,10 +2335,9 @@ async function saveStaff(){
   const section_id=parseInt(document.getElementById('m-ss').value);
   const role=document.getElementById('m-admin').checked?'admin':'staff';
   const can_view_all=document.getElementById('m-viewall').checked;
-  const can_create_groups=document.getElementById('m-groups').checked;
   if(!svc_no||!password||!name){alert('Fill all required fields.');return;}
   const issue=pwdIssue(password);if(issue){alert(issue);return;}
-  try{const hp=await hashPwd(password);await POST('staff',{svc_no,name,rank_short,designation,email,telegram_chat_id,section_id,password:hp,role,active:true,must_reset_password:true,can_view_all,can_create_groups});await loadAll();closeModal();renderAdmin();showToast('Staff created — they\'ll set their own password on first login');}catch(e){alert(e.message);}
+  try{const hp=await hashPwd(password);await POST('staff',{svc_no,name,rank_short,designation,email,telegram_chat_id,section_id,password:hp,role,active:true,must_reset_password:true,can_view_all});await loadAll();closeModal();renderAdmin();showToast('Staff created — they\'ll set their own password on first login');}catch(e){alert(e.message);}
 }
 async function updateStaff(svc_no){
   const name=document.getElementById('m-fn').value.trim();
@@ -2335,16 +2348,15 @@ async function updateStaff(svc_no){
   const section_id=parseInt(document.getElementById('m-ss').value);
   const role=document.getElementById('m-admin').checked?'admin':'staff';
   const can_view_all=document.getElementById('m-viewall').checked;
-  const can_create_groups=document.getElementById('m-groups').checked;
   const extraSecIds=Array.from(document.querySelectorAll('.ss-extra:checked')).map(c=>parseInt(c.value));
   try{
-    await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc_no),{name,rank_short,designation,email,telegram_chat_id,section_id,role,can_view_all,can_create_groups});
+    await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc_no),{name,rank_short,designation,email,telegram_chat_id,section_id,role,can_view_all});
     const staffRow=DB.staff.find(s=>s.svc_no===svc_no);
     if(staffRow){
       try{await DEL('staff_sections','staff_id=eq.'+staffRow.id);}catch(e){}
       if(extraSecIds.length)await Promise.all(extraSecIds.map(sid=>POST('staff_sections',{staff_id:staffRow.id,section_id:sid})));
     }
-    if(U.svc_no===svc_no){U.can_view_all=can_view_all;U.can_create_groups=can_create_groups;U.role=role;}
+    if(U.svc_no===svc_no){U.can_view_all=can_view_all;U.role=role;}
     await loadAll();closeModal();renderAdmin();showToast('Staff updated');
   }catch(e){alert(e.message);}
 }
