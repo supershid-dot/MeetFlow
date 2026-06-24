@@ -192,6 +192,17 @@ ALTER TABLE staff_leaves DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS staff_leaves_staff_idx ON staff_leaves(staff_id);
 CREATE INDEX IF NOT EXISTS staff_leaves_dates_idx ON staff_leaves(date_from, date_to);
 
+-- ─────────────────────────── MULTI-SECTION ACCESS ────────────────
+-- Allows a staff member to view and manage meetings for extra sections
+-- beyond their primary section_id (e.g. supervisors overseeing multiple units).
+CREATE TABLE IF NOT EXISTS staff_sections (
+  staff_id   integer REFERENCES staff(id)    ON DELETE CASCADE,
+  section_id integer REFERENCES sections(id) ON DELETE CASCADE,
+  PRIMARY KEY (staff_id, section_id)
+);
+ALTER TABLE staff_sections DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS staff_sections_staff_idx ON staff_sections(staff_id);
+
 -- ─────────────────────────── APP CONFIG ──────────────────────────
 -- Generic key-value store for app-wide settings (e.g. Telegram bot token).
 -- Storing here means the setting is shared across all browsers/devices.
