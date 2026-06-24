@@ -231,6 +231,60 @@ CREATE TABLE IF NOT EXISTS app_config (
 );
 ALTER TABLE app_config DISABLE ROW LEVEL SECURITY;
 
+-- ─────────────────────────── STEP 2: ENABLE RLS (run after Edge Function is deployed) ──────────
+-- Run this block AFTER deploying supabase/functions/meetflow-login.
+-- It closes direct anon-key access to all tables and requires a valid
+-- JWT (issued by the Edge Function) for every PostgREST request.
+--
+-- Deploy steps:
+--   1. supabase login
+--   2. supabase link --project-ref <your-project-ref>
+--   3. supabase secrets set SUPABASE_JWT_SECRET=<value from Settings → API → JWT Settings>
+--   4. supabase functions deploy meetflow-login
+--   5. Run this SQL block in the Supabase SQL Editor
+
+-- Grant the authenticated Postgres role full access to all tables
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+-- Enable RLS (overrides the DISABLE statements above for each table)
+ALTER TABLE sections              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meetings              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE participants          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meeting_groups        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meeting_group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meeting_group_access  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE room_blocks           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_leaves          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_sections        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_config            ENABLE ROW LEVEL SECURITY;
+
+-- Create permissive policies for the authenticated role.
+-- The anon key (browser) now requires a valid JWT from the Edge Function.
+-- Finer per-row restrictions can be added here later without app changes.
+DO $$
+DECLARE tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY['sections','rooms','staff','meetings','participants',
+    'notifications','meeting_groups','meeting_group_members','meeting_group_access',
+    'room_blocks','staff_leaves','staff_sections','app_config']::text[] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS auth_all ON %I', tbl);
+    EXECUTE format(
+      'CREATE POLICY auth_all ON %I FOR ALL TO authenticated USING (true) WITH CHECK (true)',
+      tbl
+    );
+  END LOOP;
+END $$;
+
+-- Revoke direct anon access — the anon key is only used to invoke the Edge Function
+REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM anon;
+
 -- ─────────────────────────── DONE ─────────────────────────────────
--- After running this, open the app, paste your Supabase URL + anon key,
+-- After running the base schema, open the app, paste your Supabase URL + anon key,
 -- then sign in with service number SVC000 / Admin1234.
+-- After deploying the Edge Function and running Step 2, direct DB access
+-- via the anon key is blocked — all requests require a valid login JWT.
