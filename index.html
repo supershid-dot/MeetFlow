@@ -716,10 +716,12 @@ function saveCalHours(){
 }
 
 /* =================== SUPABASE REST =================== */
-let SB_URL='',SB_KEY='';
+let SB_URL='',SB_KEY='',SB_TOKEN='';
 function initSB(u,k){SB_URL=u.replace(/\/+$/,'');SB_KEY=k;}
 async function sbF(path,opts={}){
-  const res=await fetch(SB_URL+'/rest/v1/'+path,{...opts,headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Accept':'application/json',...(opts.headers||{})}});
+  const bearer=SB_TOKEN||SB_KEY;
+  const res=await fetch(SB_URL+'/rest/v1/'+path,{...opts,headers:{'apikey':SB_KEY,'Authorization':'Bearer '+bearer,'Content-Type':'application/json','Accept':'application/json',...(opts.headers||{})}});
+  if(res.status===401&&SB_TOKEN){SB_TOKEN='';localStorage.removeItem('sb_token');U=null;showPage('login');showToast('Session expired — please sign in again');return{data:null,error:{message:'Session expired'}};}
   if(opts.method==='DELETE'||(opts.method==='PATCH'&&res.status===204))return{data:null,error:null};
   const text=await res.text();let data=null;
   try{data=text?JSON.parse(text):null;}catch(e){return{data:null,error:{message:text}};}
@@ -733,17 +735,17 @@ async function UPSERT(t,b){const r=await sbF(t,{method:'POST',body:JSON.stringif
 async function DEL(t,p){const r=await sbF(t+'?'+p,{method:'DELETE'});if(r.error)throw new Error(r.error.message);}
 
 /* =================== CONFIG =================== */
-function loadCfg(){const u=localStorage.getItem('sb_url'),k=localStorage.getItem('sb_key');return u&&k?{u,k}:null;}
+function loadCfg(){const u=localStorage.getItem('sb_url'),k=localStorage.getItem('sb_key'),t=localStorage.getItem('sb_token');if(t)SB_TOKEN=t;return u&&k?{u,k}:null;}
 async function saveConfig(){
   const url=document.getElementById('cfg-url').value.trim(),key=document.getElementById('cfg-key').value.trim(),err=document.getElementById('cfg-err');
   if(!url||!key){showAlert(err,'Both fields required.');return;}
   if(!url.startsWith('https://')){showAlert(err,'URL must start with https://');return;}
   document.getElementById('cfg-btn').disabled=true;initSB(url,key);showPage('loading');
-  try{const r=await sbF('staff?select=id&limit=1',{method:'GET'});if(r.error)throw new Error(r.error.message);localStorage.setItem('sb_url',url);localStorage.setItem('sb_key',key);showPage('login');}
+  try{const r=await fetch(SB_URL+'/rest/v1/',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});if(!r.ok)throw new Error('HTTP '+r.status);localStorage.setItem('sb_url',url);localStorage.setItem('sb_key',key);showPage('login');}
   catch(e){showPage('config');showAlert(err,'Connect failed: '+e.message);}
   finally{document.getElementById('cfg-btn').disabled=false;}
 }
-function resetConfig(){localStorage.removeItem('sb_url');localStorage.removeItem('sb_key');showPage('config');}
+function resetConfig(){localStorage.removeItem('sb_url');localStorage.removeItem('sb_key');localStorage.removeItem('sb_token');SB_TOKEN='';U=null;showPage('config');}
 
 /* =================== STATE =================== */
 let U=null,weekOffset=0,rmWeekOffset=0,selectedStaffId=null,selectedDayIdx=null,rmDayIdx=null,selectedRoomId=null;
@@ -792,17 +794,12 @@ async function doLogin(){
   btn.disabled=true;btn.innerHTML='<div class="spin" style="width:15px;height:15px;border-width:2px;margin:0 auto"></div>';
   err.classList.add('hidden');
   try{
-    const rows=await GET('staff','select=id,svc_no,name,email,section_id,role,active,rank_short,designation,telegram_chat_id,can_view_all,can_create_groups,must_reset_password,password,sections!staff_section_id_fkey(id,name)&svc_no=ilike.'+encodeURIComponent(svc)+'&active=eq.true');
-    if(!rows.length){showAlert(err,'Account not found or inactive.');return;}
-    const user=rows[0];
-    const ok=await verifyPwd(pwd,user.password);
-    if(!ok){showAlert(err,'Incorrect password.');return;}
-    /* Auto-upgrade legacy hash (SHA-256 or plaintext) to PBKDF2 on successful login */
-    if(!user.password.startsWith('pbkdf2:')){
-      try{const h=await hashPwd(pwd);await PATCH('staff','svc_no=eq.'+encodeURIComponent(svc),{password:h});user.password=h;}catch(e_){}
-    }
-    U=user;
-    if(user.must_reset_password){showPage('newpwd');document.getElementById('np-1').value='';document.getElementById('np-2').value='';document.getElementById('np-err').classList.add('hidden');return;}
+    const res=await fetch(SB_URL+'/functions/v1/meetflow-login',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({svc_no:svc,password:pwd})});
+    const data=await res.json();
+    if(!res.ok){showAlert(err,data.error||'Login failed.');return;}
+    SB_TOKEN=data.token;localStorage.setItem('sb_token',SB_TOKEN);
+    U=data.user;
+    if(U.must_reset_password){showPage('newpwd');document.getElementById('np-1').value='';document.getElementById('np-2').value='';document.getElementById('np-err').classList.add('hidden');return;}
     enterApp();
   }catch(e){showAlert(err,'Error: '+e.message);}
   finally{btn.disabled=false;btn.innerHTML='Sign in';}
@@ -813,11 +810,11 @@ async function doSetNewPwd(){
   const issue=pwdIssue(p1);if(issue){showAlert(err,issue);return;}
   if(p1!==p2){showAlert(err,'Passwords do not match.');return;}
   btn.disabled=true;btn.innerHTML='<div class="spin" style="width:15px;height:15px;border-width:2px;margin:0 auto"></div>';
-  try{const h=await hashPwd(p1);await PATCH('staff','svc_no=eq.'+encodeURIComponent(U.svc_no),{password:h,must_reset_password:false});U.password=h;U.must_reset_password=false;showToast('Password updated');enterApp();}
+  try{const h=await hashPwd(p1);await PATCH('staff','svc_no=eq.'+encodeURIComponent(U.svc_no),{password:h,must_reset_password:false});U.must_reset_password=false;showToast('Password updated');enterApp();}
   catch(e){showAlert(err,'Error: '+e.message);}
   finally{btn.disabled=false;btn.innerHTML='Set password & continue';}
 }
-function doLogout(){U=null;weekOffset=0;rmWeekOffset=0;selectedStaffId=null;selectedDayIdx=null;rmDayIdx=null;selectedRoomId=null;showPage('login');document.getElementById('li-svc').value='';document.getElementById('li-pwd').value='';}
+function doLogout(){U=null;SB_TOKEN='';localStorage.removeItem('sb_token');weekOffset=0;rmWeekOffset=0;selectedStaffId=null;selectedDayIdx=null;rmDayIdx=null;selectedRoomId=null;showPage('login');document.getElementById('li-svc').value='';document.getElementById('li-pwd').value='';}
 function enterApp(){
   document.getElementById('who-av').textContent=initials(U.name);
   document.getElementById('who-name').textContent=staffName(U);
@@ -2836,11 +2833,10 @@ async function doChangePwd(){
   if(np!==con){showAlert(err,'Passwords do not match.');return;}
   btn.disabled=true;btn.innerHTML='<div class="spin" style="width:15px;height:15px;border-width:2px;margin:0 auto"></div>';
   try{
-    const matched=await verifyPwd(cur,U.password);
-    if(!matched){showAlert(err,'Current password is incorrect.');return;}
+    const vres=await fetch(SB_URL+'/functions/v1/meetflow-login',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({svc_no:U.svc_no,password:cur})});
+    if(!vres.ok){showAlert(err,'Current password is incorrect.');return;}
     const newHash=await hashPwd(np);
     await PATCH('staff','svc_no=eq.'+encodeURIComponent(U.svc_no),{password:newHash});
-    U.password=newHash;
     closeModal();showToast('Password changed successfully');
   }catch(e){showAlert(err,'Error: '+e.message);}
   finally{if(btn){btn.disabled=false;btn.innerHTML='Update password';}}
