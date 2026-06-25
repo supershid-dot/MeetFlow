@@ -480,6 +480,7 @@ tbody tr:hover td{background:var(--panel2)}
       <div class="profile-menu" id="profile-menu" style="display:none">
         <button class="pm-item" onclick="openMyLeaveModal();closeProfileMenu()"><i class="ti ti-beach" aria-hidden="true"></i> My leave</button>
         <button class="pm-item" onclick="openChangePwdModal();closeProfileMenu()"><i class="ti ti-lock" aria-hidden="true"></i> Change password</button>
+        <button class="pm-item" id="pm-req-user" style="display:none" onclick="openNewUserRequest();closeProfileMenu()"><i class="ti ti-user-plus" aria-hidden="true"></i> Request new user</button>
         <div class="pm-sep"></div>
         <button class="pm-item pm-danger" onclick="doLogout()"><i class="ti ti-logout" aria-hidden="true"></i> Sign out</button>
       </div>
@@ -934,6 +935,8 @@ function buildNav(){
   <button class="sb-footer-btn" onclick="doLogout()"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</button>`;
   // Show Pre-book button for admin only
   const pbBtn=document.getElementById('btn-prebook');if(pbBtn){if(isAdmin)pbBtn.classList.remove('hidden');else pbBtn.classList.add('hidden');}
+  // Show Request new user in profile menu for permitted staff
+  const pmReq=document.getElementById('pm-req-user');if(pmReq)pmReq.style.display=(U.role==='admin'||U.can_request_users)?'':'none';
   // Sync theme icon
   const t=document.documentElement.getAttribute('data-theme');
   const sbic=document.getElementById('theme-icon-sb');if(sbic)sbic.className='ti '+(t==='dark'?'ti-sun':'ti-moon');
