@@ -2703,7 +2703,12 @@ async function renderHome(){
   const listEl=document.getElementById('home-today-list');
   if(listEl){
     if(!todayMeetings.length){listEl.innerHTML='<div class="alert a-info"><i class="ti ti-calendar-off" aria-hidden="true"></i>No meetings today — enjoy your day!</div>';}
-    else{listEl.innerHTML=todayMeetings.map(_mcard).join('');}
+    else{
+      const nowSlotNow=Math.floor((new Date().getHours()*60+new Date().getMinutes())/15);
+      const statusOrder=m=>nowSlotNow>=m.start_slot&&nowSlotNow<m.start_slot+m.duration?0:nowSlotNow<m.start_slot?1:2;
+      const sorted=[...todayMeetings].sort((a,b)=>statusOrder(a)-statusOrder(b)||a.start_slot-b.start_slot);
+      listEl.innerHTML=sorted.map(_mcard).join('');
+    }
   }
   const qaEl=document.getElementById('home-quick-actions');
   if(qaEl){qaEl.innerHTML=`<div class="hr" style="margin:18px 0 14px"></div><div class="section-title" style="margin:0 0 12px">Quick actions</div><div class="qa-grid"><div class="qa-card" onclick="openNewMeetingModal()"><div class="qa-icon">📅</div><div class="qa-title">New meeting</div><div class="qa-sub">Schedule now</div></div><div class="qa-card" onclick="switchTab('rooms')"><div class="qa-icon">🏢</div><div class="qa-title">Book a room</div><div class="qa-sub">Check availability</div></div></div><div class="qa-row" onclick="openMyLeaveModal()"><div class="qa-row-icon">🏖</div><div><div class="qa-title" style="text-align:left">My leave</div><div class="qa-sub" style="text-align:left">Record annual, sick & other leave</div></div><i class="ti ti-chevron-right" style="margin-left:auto;color:var(--faint);font-size:14px" aria-hidden="true"></i></div>`;}
