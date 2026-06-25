@@ -561,24 +561,22 @@ tbody tr:hover td{background:var(--panel2)}
     <!-- MEETINGS TAB -->
     <div id="tab-meetings" class="hidden">
       <div class="ph"><div class="ph-eyebrow">My Meetings</div><div class="ph-title">All Meetings</div><div class="ph-sub">Internal bookings and external meetings</div></div>
-      <div class="ctrl-row" style="margin-bottom:10px">
-        <div class="pill-group" id="meetings-filter">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div class="pill-group" id="meetings-filter" style="flex:1;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px">
           <button class="pill active" data-filter="all" onclick="filterMeetings('all',this)">All</button>
           <button class="pill" data-filter="today" onclick="filterMeetings('today',this)"><i class="ti ti-calendar-due" aria-hidden="true"></i> Today</button>
           <button class="pill" data-filter="internal" onclick="filterMeetings('internal',this)"><i class="ti ti-door" aria-hidden="true"></i> Internal</button>
           <button class="pill" data-filter="external" onclick="filterMeetings('external',this)"><i class="ti ti-building" aria-hidden="true"></i> External</button>
           <button class="pill" data-filter="cancelled" onclick="filterMeetings('cancelled',this)"><i class="ti ti-ban" aria-hidden="true"></i> Cancelled</button>
         </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-sm hidden" id="btn-prebook" onclick="openPreBookingModal()"><i class="ti ti-calendar-repeat" aria-hidden="true"></i>Pre-book</button>
-          <button class="btn btn-accent btn-sm" onclick="openNewMeetingModal()"><i class="ti ti-plus" aria-hidden="true"></i>New</button>
-        </div>
+        <button class="btn btn-accent btn-sm" onclick="openNewMeetingModal()" style="flex-shrink:0"><i class="ti ti-plus" aria-hidden="true"></i>New</button>
       </div>
-      <div class="ctrl-row" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div class="seg-ctrl" id="time-seg">
           <button class="seg active" onclick="setTimeSeg('upcoming',this)"><i class="ti ti-calendar-up" aria-hidden="true"></i> Upcoming</button>
           <button class="seg" onclick="setTimeSeg('past',this)"><i class="ti ti-calendar-down" aria-hidden="true"></i> Past</button>
         </div>
+        <button class="btn btn-sm hidden" id="btn-prebook" onclick="openPreBookingModal()"><i class="ti ti-calendar-repeat" aria-hidden="true"></i>Pre-book</button>
       </div>
       <div id="meetings-list" class="stack"></div>
     </div>
