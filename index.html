@@ -797,7 +797,7 @@ async function doLogin(){
     /* Try Edge Function first; fall back to direct DB auth if not yet deployed */
     let user=null;
     try{
-      const res=await fetch(SB_URL+'/functions/v1/meetflow-login',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({svc_no:svc,password:pwd})});
+      const res=await fetch(SB_URL+'/functions/v1/meetflow-login',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},body:JSON.stringify({svc_no:svc,password:pwd})});
       if(res.ok){
         const data=await res.json();
         SB_TOKEN=data.token;localStorage.setItem('sb_token',SB_TOKEN);
@@ -2857,7 +2857,7 @@ async function doChangePwd(){
   if(np!==con){showAlert(err,'Passwords do not match.');return;}
   btn.disabled=true;btn.innerHTML='<div class="spin" style="width:15px;height:15px;border-width:2px;margin:0 auto"></div>';
   try{
-    const vres=await fetch(SB_URL+'/functions/v1/meetflow-login',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({svc_no:U.svc_no,password:cur})});
+    const vres=await fetch(SB_URL+'/functions/v1/meetflow-login',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},body:JSON.stringify({svc_no:U.svc_no,password:cur})});
     if(!vres.ok){showAlert(err,'Current password is incorrect.');return;}
     const newHash=await hashPwd(np);
     await PATCH('staff','svc_no=eq.'+encodeURIComponent(U.svc_no),{password:newHash});
