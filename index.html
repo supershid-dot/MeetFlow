@@ -751,6 +751,9 @@ function resetConfig(){localStorage.removeItem('sb_url');localStorage.removeItem
 let U=null,weekOffset=0,rmWeekOffset=0,selectedStaffId=null,selectedDayIdx=null,rmDayIdx=null,selectedRoomId=null;
 let DB={sections:[],rooms:[],staff:[],groups:[],meetings:[],staff_sections:[]};
 let allMeetingsCache=[],meetingFilter='all',meetingTimeSeg='upcoming';
+/* Meeting caches used for room-conflict and busy checks */
+let _rmMtgs=[],_rmRoomId=null,_rmWkS='',_rmWkE='';
+let _calMtgs=[],_calWkS='',_calWkE='';
 
 function showPage(p){['config','loading','login','newpwd','app'].forEach(x=>document.getElementById(x+'-page').classList.add('hidden'));document.getElementById(p+'-page').classList.remove('hidden');}
 
@@ -1097,7 +1100,7 @@ async function renderCal(){
   ey.textContent=isViewingSelf?`${(U.svc_no||'').toUpperCase()} · CALENDAR`:`VIEWING: ${staffName(viewing).toUpperCase()}`;
 
   let meetings=[];
-  try{meetings=await GET('meetings',`select=*,participants(*)&date=gte.${s}&date=lte.${e}&is_cancelled=not.is.true&order=start_slot.asc`);}catch(e_){console.error(e_);}
+  try{meetings=await GET('meetings',`select=*,participants(*)&date=gte.${s}&date=lte.${e}&is_cancelled=not.is.true&order=start_slot.asc`);_calMtgs=meetings;_calWkS=s;_calWkE=e;}catch(e_){console.error(e_);}
   const viewMeetings=meetings.filter(m=>{
     if(m.created_by===viewing.id)return true;
     return m.participants&&m.participants.some(p=>p.staff_id===viewing.id);
@@ -1125,7 +1128,7 @@ async function renderRooms(){
 
   let roomMeetings=[];
   if(selectedRoomId){
-    try{roomMeetings=await GET('meetings',`select=*,participants(*)&date=gte.${s}&date=lte.${e}&room_id=eq.${selectedRoomId}&type=eq.internal&is_cancelled=not.is.true&order=start_slot.asc`);}catch(e_){console.error(e_);}
+    try{roomMeetings=await GET('meetings',`select=*,participants(*)&date=gte.${s}&date=lte.${e}&room_id=eq.${selectedRoomId}&is_cancelled=not.is.true&order=start_slot.asc`);_rmMtgs=roomMeetings;_rmRoomId=selectedRoomId;_rmWkS=s;_rmWkE=e;}catch(e_){console.error(e_);}
   }
   const today=new Date();today.setHours(0,0,0,0);
   const dates=Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});
@@ -1166,9 +1169,16 @@ function bookSelectedRoom(){
 async function computeMaxDuration(date,room_id,start_slot,excludeId){
   const dayEnd=CAL_END*4;
   if(!room_id||!date)return dayEnd-start_slot;
-  let ms=[];
-  try{ms=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&type=eq.internal&is_cancelled=not.is.true`);}catch(e){return dayEnd-start_slot;}
-  ms=ms.filter(m=>m.id!==excludeId);
+  let ms;
+  if(_rmRoomId===room_id&&_rmWkS&&date>=_rmWkS&&date<=_rmWkE){
+    ms=_rmMtgs.filter(m=>m.date===date&&m.room_id===room_id&&!m.is_cancelled);
+  }else if(_calWkS&&date>=_calWkS&&date<=_calWkE){
+    ms=_calMtgs.filter(m=>m.date===date&&m.room_id===room_id&&!m.is_cancelled);
+  }else{
+    try{ms=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&is_cancelled=not.is.true`);}
+    catch(e){return dayEnd-start_slot;}
+  }
+  ms=(ms||[]).filter(m=>m.id!==excludeId);
   let limit=dayEnd;
   for(const m of ms){
     if(m.start_slot<=start_slot&&start_slot<m.start_slot+m.duration)return 0;
@@ -1393,13 +1403,18 @@ async function checkParticipantBusy(p){
   if(busy)showToast(`${p.name} is already booked at this time — added anyway`);
 }
 async function isStaffBusy(staffId,date,start,dur,excludeId){
-  let ms=[];
-  try{ms=await GET('meetings',`select=id,start_slot,duration,created_by,participants(staff_id,rsvp)&date=eq.${date}&is_cancelled=not.is.true`);}catch(e){return false;}
-  return ms.some(m=>{
+  let ms;
+  if(_calWkS&&date>=_calWkS&&date<=_calWkE){
+    ms=_calMtgs.filter(m=>m.date===date&&!m.is_cancelled);
+  }else{
+    try{ms=await GET('meetings',`select=id,start_slot,duration,created_by,participants(staff_id,rsvp)&date=eq.${date}&is_cancelled=not.is.true`);}
+    catch(e){return false;}
+  }
+  return(ms||[]).some(m=>{
     if(m.id===excludeId)return false;
     if(!slotsOverlap(start,dur,m.start_slot,m.duration))return false;
     if(m.created_by===staffId)return true;
-    return (m.participants||[]).some(p=>p.staff_id===staffId&&p.rsvp!=='declined');
+    return(m.participants||[]).some(p=>p.staff_id===staffId&&p.rsvp!=='declined');
   });
 }
 function addExtParticipant(){
@@ -1473,8 +1488,8 @@ async function saveMeeting(){
   const type=window._mtype||'internal';
   const{mode,location,room_id,no_room,meeting_link}=collectPlace();
   // Room conflict pre-booking check (Issue 5)
-  if(type==='internal'&&room_id&&mode!=='online'){
-    const existing=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&type=eq.internal&is_cancelled=not.is.true`);
+  if(room_id&&mode!=='online'){
+    const existing=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&is_cancelled=not.is.true`);
     const conflict=existing.filter(m=>slotsOverlap(start_slot,duration,m.start_slot,m.duration));
     if(conflict.length){showAlert(err,'This room is already booked for that time. Choose a different room or time.');return;}
   }
@@ -1828,8 +1843,8 @@ async function updateMeeting(meetingId){
   if(!durVal||!duration){showAlert(err,'No free time available for the selected room/slot.');return;}
   const type=window._mtype;
   const{mode,location,room_id,no_room,meeting_link}=collectPlace();
-  if(type==='internal'&&room_id&&mode!=='online'){
-    const existing=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&type=eq.internal&is_cancelled=not.is.true`);
+  if(room_id&&mode!=='online'){
+    const existing=await GET('meetings',`select=id,start_slot,duration&date=eq.${date}&room_id=eq.${room_id}&is_cancelled=not.is.true`);
     const conflict=existing.filter(m=>m.id!==meetingId&&slotsOverlap(start_slot,duration,m.start_slot,m.duration));
     if(conflict.length){showAlert(err,'This room is already booked for that time.');return;}
   }
@@ -2654,7 +2669,7 @@ async function renderHome(){
   const dEl=document.getElementById('home-date');if(dEl)dEl.textContent=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   let todayMeetings=[],pendingRsvps=0,nextMeeting=null;
   try{
-    const allToday=await GET('meetings','select=*,participants(*)&date=eq.'+ts+'&is_cancelled=not.is.true&order=start_slot.asc');
+    const allToday=await GET('meetings','select=*,participants(*)&date=eq.'+ts+'&is_cancelled=not.is.true&order=start_slot.asc');_calMtgs=allToday;_calWkS=ts;_calWkE=ts;
     todayMeetings=allToday.filter(m=>canSeeMeetingDetails(m)||(m.participants||[]).some(p=>p.staff_id===U.id));
     const nowSlot=Math.floor((new Date().getHours()*60+new Date().getMinutes())/15);
     const upcoming=todayMeetings.filter(m=>m.start_slot>nowSlot);
