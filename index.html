@@ -2850,7 +2850,7 @@ async function renderHome(){
   let todayMeetings=[],pendingRsvps=0,nextMeeting=null;
   try{
     const allToday=await GET('meetings','select=*,participants(*)&date=eq.'+ts+'&is_cancelled=not.is.true&order=start_slot.asc');_calMtgs=allToday;_calWkS=ts;_calWkE=ts;
-    todayMeetings=allToday.filter(m=>canSeeMeetingDetails(m)||(m.participants||[]).some(p=>p.staff_id===U.id));
+    todayMeetings=allToday.filter(m=>m.created_by===U.id||(m.participants||[]).some(p=>p.staff_id===U.id));
     const nowSlot=Math.floor((new Date().getHours()*60+new Date().getMinutes())/15);
     const upcoming=todayMeetings.filter(m=>m.start_slot>nowSlot);
     if(upcoming.length)nextMeeting=upcoming[0];
