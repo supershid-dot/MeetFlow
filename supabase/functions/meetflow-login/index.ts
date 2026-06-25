@@ -19,13 +19,28 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS, status: 204 })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  let svc_no: string, password: string
+  let svc_no: string, password: string, action: string
   try {
-    ;({ svc_no, password } = await req.json())
-    if (!svc_no || !password) throw new Error('missing fields')
+    ;({ svc_no, password, action } = await req.json())
   } catch {
-    return json({ error: 'svc_no and password are required' }, 400)
+    return json({ error: 'Invalid JSON' }, 400)
   }
+
+  // Unauthenticated: submit a password-reset request on behalf of the user
+  if (action === 'forgot_password') {
+    if (!svc_no) return json({ error: 'svc_no required' }, 400)
+    const sb2 = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    )
+    const { data: staffRows } = await sb2.from('staff').select('id').ilike('svc_no', svc_no.trim()).eq('active', true).limit(1)
+    if (!staffRows?.length) return json({ error: 'Account not found or inactive' }, 404)
+    await sb2.from('staff_requests').insert({ type: 'password_reset', target_staff_id: staffRows[0].id, status: 'pending' })
+    return json({ ok: true })
+  }
+
+  if (!svc_no || !password) return json({ error: 'svc_no and password are required' }, 400)
 
   const sb = createClient(
     Deno.env.get('SUPABASE_URL')!,

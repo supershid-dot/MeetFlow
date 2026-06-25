@@ -221,6 +221,33 @@ CREATE TABLE IF NOT EXISTS staff_sections (
 ALTER TABLE staff_sections DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS staff_sections_staff_idx ON staff_sections(staff_id);
 
+-- ─────────────────────────── STAFF REQUESTS ─────────────────────
+-- New user requests and password reset requests submitted by staff.
+CREATE TABLE IF NOT EXISTS staff_requests (
+  id               serial  PRIMARY KEY,
+  type             text    NOT NULL,   -- 'new_user' | 'password_reset'
+  status           text    NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
+  -- New user fields
+  req_svc_no       text,
+  req_name         text,
+  req_email        text,
+  req_rank_short   text,
+  req_designation  text,
+  req_section_id   integer REFERENCES sections(id),
+  req_telegram_chat_id text,
+  req_notes        text,
+  -- Password reset fields
+  target_staff_id  integer REFERENCES staff(id),
+  -- Common
+  requested_by     integer REFERENCES staff(id),
+  created_at       timestamptz DEFAULT now(),
+  processed_by     integer REFERENCES staff(id),
+  processed_at     timestamptz,
+  admin_response   text
+);
+ALTER TABLE staff_requests DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS staff_requests_status_idx ON staff_requests(status);
+
 -- ─────────────────────────── APP CONFIG ──────────────────────────
 -- Generic key-value store for app-wide settings (e.g. Telegram bot token).
 -- Storing here means the setting is shared across all browsers/devices.

@@ -297,6 +297,20 @@ tbody tr:hover td{background:var(--panel2)}
 .pill{padding:6px 14px;border-radius:100px;border:1px solid var(--line);background:var(--panel2);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--ease)}
 .pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .pill:hover:not(.active){border-color:var(--faint)}
+/* NOTIFY PARTICIPANTS TABS */
+.nt-tabs{display:flex;gap:3px;background:var(--panel2);border-radius:8px;padding:3px;margin-bottom:10px}
+.ntab{flex:1;padding:6px 4px;font-size:11px;font-weight:600;border:none;background:transparent;color:var(--dim);cursor:pointer;border-radius:6px;transition:all var(--ease);text-align:center;display:flex;align-items:center;justify-content:center;gap:4px}
+.ntab.active{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.ntab:hover:not(.active){color:var(--ink)}
+.nt-row{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.nt-desc{flex:1;font-size:12px;color:var(--dim);line-height:1.4}
+/* STAFF REQUESTS */
+.req-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin-bottom:10px}
+.req-card-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
+.req-type-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;background:var(--accent-bg);color:var(--accent-ink);text-transform:uppercase}
+.req-meta{font-size:11px;color:var(--dim);line-height:1.8}
+.req-actions{display:flex;gap:6px;margin-top:10px}
+.req-count{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;border-radius:100px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;margin-left:5px;padding:0 4px}
 
 /* ADMIN GRID */
 .adgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -577,6 +591,7 @@ tbody tr:hover td{background:var(--panel2)}
     <!-- ADMIN TAB -->
     <div id="tab-admin" class="hidden">
       <div class="ph"><div class="ph-eyebrow">Admin</div><div class="ph-title">Manage</div><div class="ph-sub">Staff, sections, rooms and groups</div></div>
+      <div id="admin-requests-section" style="margin-bottom:18px"></div>
       <div class="adgrid" style="margin-bottom:14px">
         <div class="panel" id="cal-hours-panel">
           <div class="panel-head"><div class="panel-title"><i class="ti ti-clock" aria-hidden="true"></i>Calendar Hours</div></div>
@@ -913,6 +928,7 @@ function buildNav(){
   </div>
   <button class="sb-footer-btn" onclick="openChangePwdModal()"><i class="ti ti-lock" aria-hidden="true"></i>Change password</button>
   <button class="sb-footer-btn" onclick="openMyLeaveModal()"><i class="ti ti-beach" aria-hidden="true"></i>My leave</button>
+  <button class="sb-footer-btn" onclick="openNewUserRequest()"><i class="ti ti-user-plus" aria-hidden="true"></i>Request new user</button>
   <button class="sb-footer-btn" onclick="toggleTheme()"><i class="ti ti-moon" id="theme-icon-sb" aria-hidden="true"></i>Toggle theme</button>
   <button class="sb-footer-btn" onclick="doLogout()"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</button>`;
   // Show Pre-book button for admin only
@@ -1672,23 +1688,28 @@ function viewMeetingModal(m){
           </div>
         </div>`:''}
 
-        ${(canSee&&canEditNow)?`<div class="hr" style="margin:14px 0"></div><div class="section-title">Notify participants</div>
-        <div class="pill-group" style="margin-bottom:12px">
-          <button class="pill active" onclick="switchNotifyTab('schedule',this)"><i class="ti ti-calendar-share" aria-hidden="true"></i> Schedule</button>
-          <button class="pill" onclick="switchNotifyTab('reminder',this)"><i class="ti ti-bell-ringing" aria-hidden="true"></i> Reminder</button>
-          <button class="pill" onclick="switchNotifyTab('message',this)"><i class="ti ti-message" aria-hidden="true"></i> Message</button>
+        ${(canSee&&canEditNow)?`<div class="hr" style="margin:14px 0"></div>
+        <div class="section-title">Notify participants</div>
+        <div class="nt-tabs">
+          <button class="ntab active" onclick="switchNotifyTab('schedule',this)"><i class="ti ti-calendar-share" aria-hidden="true"></i> Schedule</button>
+          <button class="ntab" onclick="switchNotifyTab('reminder',this)"><i class="ti ti-bell-ringing" aria-hidden="true"></i> Reminder</button>
+          <button class="ntab" onclick="switchNotifyTab('message',this)"><i class="ti ti-message" aria-hidden="true"></i> Message</button>
         </div>
         <div id="nt-schedule" class="nt-panel">
-          <div class="alert a-info" style="margin-bottom:10px;font-size:13px"><i class="ti ti-brand-telegram" aria-hidden="true"></i> Sends the full meeting details with ✅/❌ RSVP buttons to all participants via Telegram.</div>
-          <button class="btn btn-accent" onclick="sendMeetingComm(${m.id},'schedule')"><i class="ti ti-send" aria-hidden="true"></i> Send Schedule</button>
+          <div class="nt-row">
+            <span class="nt-desc"><i class="ti ti-brand-telegram" aria-hidden="true"></i> Sends meeting details with ✅/❌ RSVP buttons to all participants via Telegram.</span>
+            <button class="btn btn-accent btn-sm" onclick="sendMeetingComm(${m.id},'schedule')"><i class="ti ti-send" aria-hidden="true"></i> Send</button>
+          </div>
         </div>
         <div id="nt-reminder" class="nt-panel" style="display:none">
-          <div class="alert a-warn" style="margin-bottom:10px;font-size:13px"><i class="ti ti-bell-ringing" aria-hidden="true"></i> Sends a ⏰ reminder notification to all participants via Telegram.</div>
-          <button class="btn btn-warn" onclick="sendMeetingComm(${m.id},'reminder')"><i class="ti ti-send" aria-hidden="true"></i> Send Reminder</button>
+          <div class="nt-row">
+            <span class="nt-desc"><i class="ti ti-bell-ringing" aria-hidden="true"></i> Sends a ⏰ reminder to all participants via Telegram.</span>
+            <button class="btn btn-warn btn-sm" onclick="sendMeetingComm(${m.id},'reminder')"><i class="ti ti-send" aria-hidden="true"></i> Send</button>
+          </div>
         </div>
         <div id="nt-message" class="nt-panel" style="display:none">
-          <div class="field"><textarea id="email-body" placeholder="Type a custom message to all attendees…" style="min-height:60px;width:100%;box-sizing:border-box"></textarea></div>
-          <button class="btn" style="margin-top:6px" onclick="sendMeetingComm(${m.id},'message')"><i class="ti ti-send" aria-hidden="true"></i> Send Message</button>
+          <textarea id="email-body" class="notes-area" placeholder="Custom message to all attendees…" style="min-height:52px;margin-bottom:6px"></textarea>
+          <div style="text-align:right"><button class="btn btn-sm" onclick="sendMeetingComm(${m.id},'message')"><i class="ti ti-send" aria-hidden="true"></i> Send</button></div>
         </div>`:''}
         ${isPast&&U.role!=='admin'?'<div class="alert a-warn" style="margin-top:12px"><i class="ti ti-lock" aria-hidden="true"></i>Past meetings can only be edited by admin.</div>':''}
       </div>
@@ -1737,7 +1758,7 @@ function rsvpChange(meetingId){
 function switchNotifyTab(tab,btn){
   document.querySelectorAll('.nt-panel').forEach(p=>p.style.display='none');
   const panel=document.getElementById('nt-'+tab);if(panel)panel.style.display='';
-  btn.closest('.pill-group').querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  btn.closest('.nt-tabs').querySelectorAll('.ntab').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active');
 }
 function setTimeSeg(seg,btn){
@@ -2386,9 +2407,153 @@ async function rsvpFromNotif(meetingId,partId,response){
   }catch(e){alert(e.message);}
 }
 
+/* =================== STAFF REQUESTS =================== */
+function genTempPwd(){const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';let p='';for(let i=0;i<10;i++)p+=c[Math.floor(Math.random()*c.length)];return p;}
+
+function openNewUserRequest(){
+  showModal(`<div class="modal-head"><div class="modal-title"><i class="ti ti-user-plus" aria-hidden="true"></i> Request New User</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
+<div class="modal-body"><div class="stack">
+<div class="alert a-info" style="font-size:12px"><i class="ti ti-info-circle" aria-hidden="true"></i> Admin will review your request, create the account, and send login credentials to the user via Telegram.</div>
+<div class="r2">
+  <div class="field"><label>Full name <span style="color:var(--bad)">*</span></label><input id="nur-name" placeholder="e.g. SP Ibrahim Nashid"/></div>
+  <div class="field"><label>Service No. <span style="color:var(--bad)">*</span></label><input id="nur-svc" placeholder="e.g. SVC099" style="text-transform:uppercase"/></div>
+</div>
+<div class="r2">
+  <div class="field"><label>Rank (short)</label><input id="nur-rank" placeholder="e.g. SP"/></div>
+  <div class="field"><label>Designation</label><input id="nur-desig" placeholder="e.g. Programs Officer"/></div>
+</div>
+<div class="r2">
+  <div class="field"><label>Section</label><select id="nur-sec"><option value="">— select —</option>${DB.sections.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
+  <div class="field"><label>Email</label><input type="email" id="nur-email" placeholder="user@example.com"/></div>
+</div>
+<div class="field"><label>Telegram Chat ID <span style="color:var(--bad)">*</span></label><input id="nur-tg" placeholder="e.g. 123456789" type="number"/><div style="font-size:11px;color:var(--faint);margin-top:3px">User can get this from @userinfobot on Telegram. Required to send credentials.</div></div>
+<div class="field"><label>Notes (optional)</label><textarea id="nur-notes" placeholder="Any additional context for admin…" style="min-height:48px"></textarea></div>
+<div id="nur-err" class="alert a-bad hidden"></div>
+</div></div>
+<div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" id="nur-btn" onclick="submitNewUserRequest()"><i class="ti ti-send" aria-hidden="true"></i> Submit request</button></div>`);
+}
+async function submitNewUserRequest(){
+  const name=document.getElementById('nur-name').value.trim();
+  const svc=(document.getElementById('nur-svc').value||'').trim().toUpperCase();
+  const tg=document.getElementById('nur-tg').value.trim();
+  const err=document.getElementById('nur-err'),btn=document.getElementById('nur-btn');
+  if(!name||!svc){showAlert(err,'Full name and service number are required.');return;}
+  if(!tg){showAlert(err,'Telegram Chat ID is required so credentials can be sent.');return;}
+  btn.disabled=true;btn.textContent='Submitting…';
+  try{
+    const sec=document.getElementById('nur-sec').value;
+    await POST('staff_requests',{type:'new_user',status:'pending',req_name:name,req_svc_no:svc,req_rank_short:document.getElementById('nur-rank').value.trim()||null,req_designation:document.getElementById('nur-desig').value.trim()||null,req_section_id:sec?parseInt(sec):null,req_email:document.getElementById('nur-email').value.trim()||null,req_telegram_chat_id:tg,req_notes:document.getElementById('nur-notes').value.trim()||null,requested_by:U.id});
+    closeModal();showToast('Request submitted — admin will be notified.');
+  }catch(e){showAlert(err,e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='Submit request';}}
+}
+
+async function renderAdminRequests(){
+  const el=document.getElementById('admin-requests-section');if(!el)return;
+  try{
+    const reqs=await GET('staff_requests',`select=*,requester:requested_by(id,name,svc_no,telegram_chat_id),target:target_staff_id(id,name,svc_no,telegram_chat_id)&status=eq.pending&order=created_at.asc`);
+    if(!reqs.length){el.innerHTML='';return;}
+    el.innerHTML=`<div class="panel" style="margin-bottom:0">
+      <div class="panel-head"><div class="panel-title"><i class="ti ti-inbox" aria-hidden="true"></i> Pending Requests <span class="req-count">${reqs.length}</span></div></div>
+      <div style="padding:12px 16px">${reqs.map(r=>{
+        const isNew=r.type==='new_user';
+        const time=new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+        return`<div class="req-card">
+          <div class="req-card-head">
+            <div>
+              <span class="req-type-badge">${isNew?'New User':'Password Reset'}</span>
+              <div style="font-weight:700;margin-top:5px;font-size:14px">${isNew?esc(r.req_name||''):esc(r.target?.name||'')}</div>
+            </div>
+            <div style="font-size:11px;color:var(--faint)">${time}</div>
+          </div>
+          <div class="req-meta">
+            ${isNew?`
+              <div><b>Service No:</b> ${esc(r.req_svc_no||'—')}</div>
+              ${r.req_rank_short||r.req_designation?`<div><b>Rank/Role:</b> ${esc([r.req_rank_short,r.req_designation].filter(Boolean).join(' · '))}</div>`:''}
+              ${r.req_section_id?`<div><b>Section:</b> ${esc(DB.sections.find(s=>s.id===r.req_section_id)?.name||'')}</div>`:''}
+              ${r.req_email?`<div><b>Email:</b> ${esc(r.req_email)}</div>`:''}
+              <div><b>Telegram Chat ID:</b> ${esc(r.req_telegram_chat_id||'—')}</div>
+              ${r.req_notes?`<div><b>Notes:</b> ${esc(r.req_notes)}</div>`:''}
+              <div><b>Requested by:</b> ${esc(r.requester?.name||'Unknown')}</div>
+            `:`
+              <div><b>Staff:</b> ${esc(r.target?.name||'Unknown')} (${esc(r.target?.svc_no||'')})</div>
+              <div><b>Telegram Chat ID:</b> ${esc(r.target?.telegram_chat_id||'— not set')}</div>
+              ${r.requester?`<div><b>Requested by:</b> ${esc(r.requester.name)}</div>`:'<div><b>Source:</b> Self-service (login page)</div>'}
+            `}
+          </div>
+          <div class="req-actions">
+            ${isNew
+              ?`<button class="btn btn-good btn-sm" onclick="approveNewUserReq(${r.id})"><i class="ti ti-user-check" aria-hidden="true"></i> Approve & Create</button>`
+              :`<button class="btn btn-good btn-sm" onclick="approvePasswordResetReq(${r.id})"><i class="ti ti-key" aria-hidden="true"></i> Reset & Send</button>`}
+            <button class="btn btn-danger btn-sm" onclick="rejectStaffRequest(${r.id})"><i class="ti ti-x" aria-hidden="true"></i> Reject</button>
+          </div>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }catch(e){el.innerHTML='';}
+}
+
+async function approveNewUserReq(id){
+  const reqs=await GET('staff_requests',`select=*,requester:requested_by(id,name,telegram_chat_id)&id=eq.${id}`);
+  const r=reqs[0];if(!r)return;
+  if(!confirm(`Create account for ${r.req_name} (${r.req_svc_no})?`))return;
+  const tempPwd=genTempPwd();
+  try{
+    const hp=await hashPwd(tempPwd);
+    await POST('staff',{svc_no:r.req_svc_no,name:r.req_name,email:r.req_email||'',rank_short:r.req_rank_short||null,designation:r.req_designation||null,section_id:r.req_section_id||null,telegram_chat_id:r.req_telegram_chat_id||null,password:hp,role:'staff',active:true,must_reset_password:true});
+    await PATCH('staff_requests','id=eq.'+id,{status:'approved',processed_by:U.id,processed_at:new Date().toISOString()});
+    // Send credentials to new user via Telegram
+    const token=await getTgToken();
+    if(token&&r.req_telegram_chat_id){
+      await sendTg(token,r.req_telegram_chat_id,`✅ <b>MeetFlow Account Created</b>\n\nYour account has been set up.\n\n<b>Service No:</b> <code>${r.req_svc_no}</code>\n<b>Temp Password:</b> <code>${tempPwd}</code>\n\nPlease sign in and change your password immediately.`);
+    }
+    // Notify requestor
+    if(token&&r.requester?.telegram_chat_id){
+      await sendTg(token,r.requester.telegram_chat_id,`✅ Your request to add <b>${r.req_name}</b> has been approved. Login credentials have been sent to their Telegram.`);
+    }
+    showToast('Account created — credentials sent via Telegram');
+    renderAdmin();
+  }catch(e){alert(e.message);}
+}
+
+async function approvePasswordResetReq(id){
+  const reqs=await GET('staff_requests',`select=*,target:target_staff_id(id,name,svc_no,telegram_chat_id),requester:requested_by(id,name,telegram_chat_id)&id=eq.${id}`);
+  const r=reqs[0];if(!r)return;
+  const targetName=r.target?.name||'this user';
+  if(!confirm(`Reset password for ${targetName}?`))return;
+  const tempPwd=genTempPwd();
+  try{
+    const hp=await hashPwd(tempPwd);
+    await PATCH('staff','id=eq.'+r.target_staff_id,{password:hp,must_reset_password:true});
+    await PATCH('staff_requests','id=eq.'+id,{status:'approved',processed_by:U.id,processed_at:new Date().toISOString()});
+    const token=await getTgToken();
+    if(token&&r.target?.telegram_chat_id){
+      await sendTg(token,r.target.telegram_chat_id,`🔑 <b>MeetFlow Password Reset</b>\n\nYour password has been reset by an admin.\n\n<b>Service No:</b> <code>${r.target.svc_no}</code>\n<b>Temp Password:</b> <code>${tempPwd}</code>\n\nPlease sign in and change your password immediately.`);
+    }
+    if(token&&r.requester?.telegram_chat_id&&r.requester.id!==r.target_staff_id){
+      await sendTg(token,r.requester.telegram_chat_id,`✅ Password for <b>${targetName}</b> has been reset and sent to their Telegram.`);
+    }
+    showToast('Password reset — credentials sent via Telegram');
+    renderAdmin();
+  }catch(e){alert(e.message);}
+}
+
+async function rejectStaffRequest(id){
+  const note=prompt('Rejection reason (optional):');if(note===null)return;
+  try{
+    await PATCH('staff_requests','id=eq.'+id,{status:'rejected',processed_by:U.id,processed_at:new Date().toISOString(),admin_response:note||null});
+    showToast('Request rejected');renderAdmin();
+  }catch(e){alert(e.message);}
+}
+
+async function getTgToken(){
+  try{const rows=await GET('app_config','select=value&key=eq.tg_token');return rows[0]?.value||'';}catch{return '';}
+}
+
 /* =================== ADMIN =================== */
 async function renderAdmin(){
   await loadAll();buildStaffSelect();buildRoomSelect();buildHourSelects();initTgPanel();
+  renderAdminRequests();
   document.getElementById('sec-tbody').innerHTML=DB.sections.map(s=>{
     const c=getSC(s.name);
     return`<tr><td><span class="tag" style="background:${c.bg};color:${c.tx}">${esc(s.name)}</span></td>
@@ -2860,10 +3025,24 @@ function openForgotPwd(){
   const svc=(document.getElementById('li-svc').value||'').trim().toUpperCase();
   showModal(`<div class="modal-head"><div class="modal-title">Forgot password</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
 <div class="modal-body"><div class="stack">
-<div class="alert a-info"><i class="ti ti-info-circle" aria-hidden="true"></i><span>Passwords can only be reset by a system administrator. Please contact your admin and ask them to reset your password${svc?' for account <strong>'+esc(svc)+'</strong>':''}.</span></div>
-<div style="font-size:13px;color:var(--dim)">Once reset, you will be prompted to set a new secure password when you next sign in.</div>
+<div class="alert a-info" style="font-size:13px"><i class="ti ti-brand-telegram" aria-hidden="true"></i> Submit a request — the admin will reset your password and send it to your Telegram.</div>
+<div class="field"><label>Your service number</label><input id="fp-svc" value="${esc(svc)}" placeholder="e.g. SVC001" style="text-transform:uppercase"/></div>
+<div id="fp-err" class="alert a-bad hidden"></div>
 </div></div>
-<div class="modal-foot"><button class="btn btn-accent" onclick="closeModal()">OK</button></div>`);
+<div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" id="fp-btn" onclick="submitForgotPwd()"><i class="ti ti-send" aria-hidden="true"></i> Submit request</button></div>`);
+}
+async function submitForgotPwd(){
+  const svc=(document.getElementById('fp-svc').value||'').trim().toUpperCase();
+  const err=document.getElementById('fp-err'),btn=document.getElementById('fp-btn');
+  if(!svc){showAlert(err,'Enter your service number.');return;}
+  btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const r=await fetch(SB_URL+'/functions/v1/meetflow-login',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({action:'forgot_password',svc_no:svc})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||'Request failed');
+    closeModal();showToast('Request submitted — admin will reset your password and send it via Telegram.');
+  }catch(e){showAlert(err,e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='Submit request';}}
 }
 function toggleProfileMenu(){const m=document.getElementById('profile-menu');if(m)m.style.display=m.style.display==='none'?'':'none';}
 function closeProfileMenu(){const m=document.getElementById('profile-menu');if(m)m.style.display='none';}
