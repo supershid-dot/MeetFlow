@@ -2442,14 +2442,14 @@ function openNewUserRequest(){
   <div class="field"><label>Email</label><input type="email" id="nur-email" placeholder="user@example.com"/></div>
 </div>
 <div class="field"><label>Telegram Chat ID <span style="color:var(--bad)">*</span></label><input id="nur-tg" placeholder="e.g. 123456789" type="number"/>
-<div class="alert a-info" style="margin-top:6px;font-size:12px;line-height:1.6">
-  <b><i class="ti ti-brand-telegram" aria-hidden="true"></i> How to get the user's Telegram Chat ID:</b><br>
-  1. Ask the user to open Telegram on their phone.<br>
-  2. In the search bar, search for <b>@userinfobot</b>.<br>
-  3. Tap the bot and press <b>Start</b> (or send any message).<br>
-  4. The bot will instantly reply with their <b>Chat ID</b> — a number like <code>123456789</code>.<br>
-  5. The user sends you that number to paste here.<br>
-  <span style="color:var(--faint)">This is required so MeetFlow can send the new account credentials directly to the user via Telegram.</span>
+<div class="alert a-info" style="margin-top:6px;font-size:12px;line-height:1.7;display:block">
+  <div style="font-weight:600;margin-bottom:5px"><i class="ti ti-brand-telegram" aria-hidden="true"></i> How to get the user's Telegram Chat ID:</div>
+  <div>1. Ask the user to open Telegram on their phone.</div>
+  <div>2. In the search bar, search for <b>@userinfobot</b>.</div>
+  <div>3. Tap the bot and press <b>Start</b> (or send any message).</div>
+  <div>4. The bot instantly replies with their <b>Chat ID</b> — a number like <code>123456789</code>.</div>
+  <div>5. The user sends you that number to paste here.</div>
+  <div style="margin-top:5px;opacity:.7">Required so MeetFlow can send login credentials to the user via Telegram.</div>
 </div></div>
 <div class="field"><label>Notes (optional)</label><textarea id="nur-notes" placeholder="Any additional context for admin…" style="min-height:48px"></textarea></div>
 <div id="nur-err" class="alert a-bad hidden"></div>
