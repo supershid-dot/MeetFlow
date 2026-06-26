@@ -254,19 +254,6 @@ CREATE TABLE IF NOT EXISTS staff_requests (
 ALTER TABLE staff_requests DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS staff_requests_status_idx ON staff_requests(status);
 
--- ─────────────────────────── STAFF SCHEDULE ACCESS ──────────────
--- Controls which other staff members each user can view on the calendar.
--- Admins and can_view_all users see everyone; others see only their section
--- plus any staff explicitly listed here for their viewer_id.
-CREATE TABLE IF NOT EXISTS staff_schedule_access (
-  viewer_id integer REFERENCES staff(id) ON DELETE CASCADE,
-  target_id integer REFERENCES staff(id) ON DELETE CASCADE,
-  PRIMARY KEY (viewer_id, target_id)
-);
-ALTER TABLE staff_schedule_access DISABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS ssa_viewer_idx ON staff_schedule_access(viewer_id);
-CREATE INDEX IF NOT EXISTS ssa_target_idx ON staff_schedule_access(target_id);
-
 -- ─────────────────────────── APP CONFIG ──────────────────────────
 -- Generic key-value store for app-wide settings (e.g. Telegram bot token).
 -- Storing here means the setting is shared across all browsers/devices.
@@ -306,9 +293,8 @@ ALTER TABLE meeting_group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE meeting_group_access  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE room_blocks           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_leaves          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE staff_sections            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE staff_schedule_access     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE app_config                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_sections        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_config            ENABLE ROW LEVEL SECURITY;
 
 -- Create permissive policies for the authenticated role.
 -- The anon key (browser) now requires a valid JWT from the Edge Function.
@@ -318,7 +304,7 @@ DECLARE tbl text;
 BEGIN
   FOREACH tbl IN ARRAY ARRAY['sections','rooms','staff','meetings','participants',
     'notifications','meeting_groups','meeting_group_members','meeting_group_access',
-    'room_blocks','staff_leaves','staff_sections','staff_schedule_access','app_config']::text[] LOOP
+    'room_blocks','staff_leaves','staff_sections','app_config']::text[] LOOP
     EXECUTE format('DROP POLICY IF EXISTS auth_all ON %I', tbl);
     EXECUTE format(
       'CREATE POLICY auth_all ON %I FOR ALL TO authenticated USING (true) WITH CHECK (true)',
