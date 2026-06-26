@@ -639,6 +639,7 @@ tbody tr:hover td{background:var(--panel2)}
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title"><i class="ti ti-users" aria-hidden="true"></i>Staff</div><button class="btn btn-accent btn-sm" onclick="openModal('add-staff')"><i class="ti ti-plus" aria-hidden="true"></i>Add</button></div>
+        <div style="padding:8px 16px 4px"><input type="text" id="staff-filter" placeholder="Search staff…" oninput="filterAdminStaff()" style="width:100%;padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:var(--inp);color:var(--ink)"/></div>
         <div class="tbl-wrap"><table><thead><tr><th>Svc no.</th><th>Name</th><th>Rank/Designation</th><th>Email</th><th>Section</th><th>Role</th><th>Access</th><th>Telegram</th><th>Status</th><th>Actions</th></tr></thead><tbody id="staff-tbody"></tbody></table></div>
       </div>
     </div>
@@ -793,11 +794,12 @@ function myAccessibleSecIds(){
 function visibleStaff(){
   if(canViewAll())return DB.staff.filter(s=>s.svc_no!=='SVC000');
   const mySecIds=myAccessibleSecIds();
+  const grantedIds=new Set((DB.staff_schedule_access||[]).filter(a=>a.viewer_id===U.id).map(a=>a.target_id));
   return DB.staff.filter(s=>{
     if(s.svc_no==='SVC000')return false;
     if(s.id===U.id)return true;
     if(mySecIds.has(s.section_id))return true;
-    // a supervisor whose extra sections include one of mine should also be visible
+    if(grantedIds.has(s.id))return true;
     return (DB.staff_sections||[]).some(ss=>ss.staff_id===s.id&&mySecIds.has(ss.section_id));
   });
 }
@@ -887,6 +889,7 @@ async function loadAll(){
   try{DB.leaves=await GET('staff_leaves','select=*&order=date_from.asc');}catch(e){DB.leaves=[];}
   try{const cfg=await GET('app_config','select=*');DB.config={};cfg.forEach(r=>{DB.config[r.key]=r.value;});}catch(e){DB.config={};}
   try{DB.staff_sections=await GET('staff_sections','select=*');}catch(e){DB.staff_sections=[];}
+  try{DB.staff_schedule_access=await GET('staff_schedule_access','select=*');}catch(e){DB.staff_schedule_access=[];}
   if(selectedStaffId==null)selectedStaffId=U.id;
   if(selectedRoomId==null&&DB.rooms.length)selectedRoomId=DB.rooms[0].id;
 }
@@ -2671,7 +2674,8 @@ async function renderAdmin(){
 
   document.getElementById('staff-tbody').innerHTML=DB.staff.filter(s=>s.svc_no!=='SVC000').map(s=>{
     const c=getSC(s.sections?s.sections.name:null);
-    const access=s.can_view_all?'<span class="badge b-accent" title="Can view all schedules">All cal</span>':'<span style="color:var(--faint)">—</span>';
+    const ssaCount=(DB.staff_schedule_access||[]).filter(a=>a.viewer_id===s.id).length;
+    const access=s.can_view_all?'<span class="badge b-accent" title="Can view all schedules">All cal</span>':ssaCount?`<span class="badge b-warn" title="${ssaCount} staff explicitly granted">${ssaCount} staff</span>`:'<span style="color:var(--faint)">—</span>';
     const tgBadge=s.telegram_chat_id?'<span class="badge b-good" title="Telegram linked"><i class="ti ti-brand-telegram"></i> Linked</span>':'<span style="color:var(--faint);font-size:11px">—</span>';
     return`<tr>
       <td class="mono">${s.svc_no}</td>
@@ -2688,6 +2692,7 @@ async function renderAdmin(){
         <button class="btn btn-sm ${s.active?'btn-warn':'btn-accent'}" onclick="toggleStaff(${s.id},${s.active})">${s.active?'Deactivate':'Activate'}</button>
       </div></td></tr>`;
   }).join('')||'<tr><td colspan="10" style="color:var(--faint);text-align:center;padding:12px">No staff</td></tr>';
+  filterAdminStaff();
 }
 async function delSection(id,name){if(!confirm(`Remove "${name}"?`))return;try{await DEL('sections','id=eq.'+id);await loadAll();renderAdmin();showToast('Removed');}catch(e){alert(e.message);}}
 async function delRoom(id){if(!confirm('Remove this room?'))return;try{await DEL('rooms','id=eq.'+id);await loadAll();renderAdmin();showToast('Removed');}catch(e){alert(e.message);}}
@@ -2725,9 +2730,11 @@ function openModal(type,id){
         <div class="field"><label>Group name</label><input id="g-name" placeholder="e.g. Senior Management"/></div>
         <div class="field"><label>Description (optional)</label><input id="g-desc" placeholder="e.g. SMT weekly meeting attendees"/></div>
         <div class="section-title" style="margin-top:4px">Members <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(participants added to meetings)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
+        <input type="text" placeholder="Search members…" oninput="filterGrpList(this,'g-mem-list')" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:var(--inp);color:var(--ink);margin-bottom:4px"/>
+        <div class="chk-list" id="g-mem-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
         <div class="section-title" style="margin-top:8px">Who can use this group <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(can select group when scheduling)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
+        <input type="text" placeholder="Search staff…" oninput="filterGrpList(this,'g-usr-list')" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:var(--inp);color:var(--ink);margin-bottom:4px"/>
+        <div class="chk-list" id="g-usr-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="saveGroup()">Create group</button></div>`);
   } else if(type==='edit-group'){
@@ -2738,9 +2745,11 @@ function openModal(type,id){
         <div class="field"><label>Group name</label><input id="g-name" value="${esc(g.name)}"/></div>
         <div class="field"><label>Description</label><input id="g-desc" value="${esc(g.description||'')}"/></div>
         <div class="section-title" style="margin-top:4px">Members <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(participants added to meetings)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"${memIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
+        <input type="text" placeholder="Search members…" oninput="filterGrpList(this,'g-mem-list')" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:var(--inp);color:var(--ink);margin-bottom:4px"/>
+        <div class="chk-list" id="g-mem-list">${staffList.map(s=>`<label><input type="checkbox" class="g-mem" value="${s.id}"${memIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
         <div class="section-title" style="margin-top:8px">Who can use this group <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--faint)">(can select group when scheduling)</span></div>
-        <div class="chk-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"${usrIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
+        <input type="text" placeholder="Search staff…" oninput="filterGrpList(this,'g-usr-list')" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:var(--inp);color:var(--ink);margin-bottom:4px"/>
+        <div class="chk-list" id="g-usr-list">${staffList.map(s=>`<label><input type="checkbox" class="g-usr" value="${s.id}"${usrIds.includes(s.id)?' checked':''}/>${esc(staffName(s))} · ${esc(s.svc_no||'—')}</label>`).join('')}</div>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="updateGroup(${id})">Save</button></div>`);
   } else if(type==='add-staff'){
@@ -2767,6 +2776,9 @@ function openModal(type,id){
     const extraSecHtml=otherSections.length
       ?otherSections.map(sec=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 0"><input type="checkbox" class="ss-extra" value="${sec.id}"${extraSecIds.has(sec.id)?' checked':''}/>${esc(sec.name)}</label>`).join('')
       :'<span style="color:var(--faint);font-size:12px">No other sections defined</span>';
+    const ssaTargetIds=new Set((DB.staff_schedule_access||[]).filter(a=>a.viewer_id===s.id).map(a=>a.target_id));
+    const ssaStaff=DB.staff.filter(x=>x.svc_no!=='SVC000'&&x.id!==s.id);
+    const ssaHtml=ssaStaff.map(x=>`<label><input type="checkbox" class="ssa-target" value="${x.id}"${ssaTargetIds.has(x.id)?' checked':''}/>${esc(staffName(x))} · ${esc(x.svc_no||'—')}</label>`).join('')||'<span style="color:var(--faint);font-size:12px">No other staff</span>';
     showModal(`<div class="modal-head"><div class="modal-title">Edit staff</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i></button></div>
       <div class="modal-body"><div class="stack">
         <div class="field"><label>Service no.</label><input readonly value="${s.svc_no}"/></div>
@@ -2782,6 +2794,10 @@ function openModal(type,id){
         <label class="toggle-row"><input type="checkbox" id="m-admin"${s.role==='admin'?' checked':''}/><span>Admin access</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-viewall"${s.can_view_all?' checked':''}/><span>Can view everyone's schedule</span></label>
         <label class="toggle-row"><input type="checkbox" id="m-requsers"${s.can_request_users?' checked':''}/><span>Can request new user accounts</span></label>
+        <div style="margin-top:4px"><div class="section-title">Can view schedule of <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--faint)">(explicit calendar access beyond own section)</span></div>
+          <input type="text" placeholder="Search staff…" oninput="filterGrpList(this,'m-ssa-list')" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:var(--inp);color:var(--ink);margin-bottom:4px"/>
+          <div class="chk-list" id="m-ssa-list">${ssaHtml}</div>
+        </div>
       </div></div>
       <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-accent" onclick="updateStaff('${s.svc_no}')">Save</button></div>`);
   } else if(type==='reset-pwd'){
@@ -2872,6 +2888,9 @@ async function updateStaff(svc_no){
     if(staffRow){
       try{await DEL('staff_sections','staff_id=eq.'+staffRow.id);}catch(e){}
       if(extraSecIds.length)await Promise.all(extraSecIds.map(sid=>POST('staff_sections',{staff_id:staffRow.id,section_id:sid})));
+      const accessTargetIds=Array.from(document.querySelectorAll('.ssa-target:checked')).map(c=>parseInt(c.value));
+      try{await DEL('staff_schedule_access','viewer_id=eq.'+staffRow.id);}catch(e){}
+      if(accessTargetIds.length)await Promise.all(accessTargetIds.map(tid=>POST('staff_schedule_access',{viewer_id:staffRow.id,target_id:tid})));
     }
     if(U.svc_no===svc_no){U.can_view_all=can_view_all;U.can_request_users=can_request_users;U.role=role;}
     await loadAll();closeModal();renderAdmin();showToast('Staff updated');
@@ -2884,6 +2903,21 @@ async function resetPwd(svc_no){
 }
 
 /* =================== HELPERS =================== */
+function filterAdminStaff(){
+  const q=(document.getElementById('staff-filter')||{}).value||'';
+  const lq=q.toLowerCase();
+  document.querySelectorAll('#staff-tbody tr').forEach(tr=>{
+    tr.style.display=!lq||tr.textContent.toLowerCase().includes(lq)?'':'none';
+  });
+}
+function filterGrpList(inputEl,listId){
+  const q=inputEl.value.toLowerCase();
+  const list=document.getElementById(listId);
+  if(!list)return;
+  list.querySelectorAll('label').forEach(lbl=>{
+    lbl.style.display=!q||lbl.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
 let _suppressPop=false;
 function _pushIfNeeded(){if(!history.state||!history.state.mf_modal)history.pushState({mf_modal:true},'');}
 function _goBackSuppressed(){_suppressPop=true;history.back();}
