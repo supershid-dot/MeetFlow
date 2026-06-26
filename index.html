@@ -791,9 +791,10 @@ function myAccessibleSecIds(){
   return ids;
 }
 function visibleStaff(){
-  if(canViewAll())return DB.staff;
+  if(canViewAll())return DB.staff.filter(s=>s.svc_no!=='SVC000');
   const mySecIds=myAccessibleSecIds();
   return DB.staff.filter(s=>{
+    if(s.svc_no==='SVC000')return false;
     if(s.id===U.id)return true;
     if(mySecIds.has(s.section_id))return true;
     // a supervisor whose extra sections include one of mine should also be visible
@@ -1315,7 +1316,16 @@ function openNewMeetingModal(preDate,preSlot,preRoomId){
           </div>
           <div style="font-size:11px;color:var(--faint);margin-top:5px">Public: title &amp; time visible to all. Private: only visible to participants.</div>
         </div>
-        <div class="field" style="margin-top:14px"><label>Agenda / notes</label><textarea id="nm-notes" placeholder="Optional agenda or description"></textarea></div>
+        <div class="field" style="margin-top:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <label style="margin:0">Agenda / notes</label>
+            <div class="lang-toggle">
+              <button class="active" onclick="setNoteLang('nm-notes','en',this)">EN</button>
+              <button onclick="setNoteLang('nm-notes','dv',this)">ދިވެހި</button>
+            </div>
+          </div>
+          <textarea id="nm-notes" class="notes-area" placeholder="Optional agenda or description"></textarea>
+        </div>
         <div style="margin-top:14px">
           <div class="section-title">Participants</div>
           <div id="nm-participants" class="stack" style="gap:6px"></div>
@@ -1461,7 +1471,7 @@ function refreshStaffDropdown(){
 function filterStaffSel(q){
   const sel=document.getElementById('nm-add-staff');if(!sel)return;
   const addedIds=new Set((window._mparticipants||[]).filter(p=>p.staff_id).map(p=>p.staff_id));
-  const filtered=DB.staff.filter(s=>s.id!==U.id&&!addedIds.has(s.id)&&(!q||staffName(s).toLowerCase().includes(q.toLowerCase())||(s.svc_no||'').toLowerCase().includes(q.toLowerCase())));
+  const filtered=DB.staff.filter(s=>s.svc_no!=='SVC000'&&s.id!==U.id&&!addedIds.has(s.id)&&(!q||staffName(s).toLowerCase().includes(q.toLowerCase())||(s.svc_no||'').toLowerCase().includes(q.toLowerCase())));
   sel.innerHTML=filtered.length
     ?filtered.map(s=>`<option value="${s.id}">${esc(staffName(s))} · ${esc(s.svc_no||'')}</option>`).join('')
     :'<option value="" disabled>No staff found</option>';
@@ -1552,6 +1562,7 @@ async function saveMeeting(){
     }
     closeModal();showToast('Meeting scheduled');refreshActiveViews();
     scheduleNotifs(mRow.id);
+    sendMeetingComm(mRow.id,'schedule',null,false,false);
   }catch(e){showAlert(err,'Error: '+e.message);btn.disabled=false;btn.textContent='Schedule';}
 }
 
@@ -1697,6 +1708,25 @@ function viewMeetingModal(m){
 
         ${(canSee&&canEditNow)?`<div class="hr" style="margin:14px 0"></div>
         <div class="section-title">Notify participants</div>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em">Recipients</span>
+            <button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px" onclick="toggleAllNtRecip(true)">All</button>
+            <button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px" onclick="toggleAllNtRecip(false)">None</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;max-height:110px;overflow-y:auto">
+            ${ps.map(p=>{
+              const _ps2=p.staff_id?DB.staff.find(x=>x.id===p.staff_id):null;
+              const _pn2=_ps2?staffName(_ps2):p.name;
+              const hasTg=!!(_ps2?.telegram_chat_id)||false;
+              return`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;padding:3px 0">
+                <input type="checkbox" class="nt-recip-cb" value="${p.id}" checked>
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(_pn2)}${p.is_external?' <span style="color:var(--faint)">(ext)</span>':''}</span>
+                ${hasTg?'<span class="badge b-good" style="font-size:9px;padding:1px 5px"><i class="ti ti-brand-telegram" aria-hidden="true"></i></span>':'<span style="font-size:10px;color:var(--faint)">no TG</span>'}
+              </label>`;
+            }).join('')}
+          </div>
+        </div>
         <div class="nt-tabs">
           <button class="ntab active" onclick="switchNotifyTab('schedule',this)"><i class="ti ti-calendar-share" aria-hidden="true"></i> Schedule</button>
           <button class="ntab" onclick="switchNotifyTab('reminder',this)"><i class="ti ti-bell-ringing" aria-hidden="true"></i> Reminder</button>
@@ -1704,19 +1734,19 @@ function viewMeetingModal(m){
         </div>
         <div id="nt-schedule" class="nt-panel">
           <div class="nt-row">
-            <span class="nt-desc"><i class="ti ti-brand-telegram" aria-hidden="true"></i> Sends meeting details with ✅/❌ RSVP buttons to all participants via Telegram.</span>
-            <button class="btn btn-accent btn-sm" onclick="sendMeetingComm(${m.id},'schedule')"><i class="ti ti-send" aria-hidden="true"></i> Send</button>
+            <span class="nt-desc"><i class="ti ti-brand-telegram" aria-hidden="true"></i> Sends meeting details with ✅/❌ RSVP buttons via Telegram.</span>
+            <button class="btn btn-accent btn-sm" onclick="(()=>{const ids=[...document.querySelectorAll('.nt-recip-cb:checked')].map(x=>+x.value);sendMeetingComm(${m.id},'schedule',null,false,false,ids);})()"><i class="ti ti-send" aria-hidden="true"></i> Send</button>
           </div>
         </div>
         <div id="nt-reminder" class="nt-panel" style="display:none">
           <div class="nt-row">
-            <span class="nt-desc"><i class="ti ti-bell-ringing" aria-hidden="true"></i> Sends a ⏰ reminder to all participants via Telegram.</span>
-            <button class="btn btn-warn btn-sm" onclick="sendMeetingComm(${m.id},'reminder')"><i class="ti ti-send" aria-hidden="true"></i> Send</button>
+            <span class="nt-desc"><i class="ti ti-bell-ringing" aria-hidden="true"></i> Sends a ⏰ reminder via Telegram.</span>
+            <button class="btn btn-warn btn-sm" onclick="(()=>{const ids=[...document.querySelectorAll('.nt-recip-cb:checked')].map(x=>+x.value);sendMeetingComm(${m.id},'reminder',null,false,false,ids);})()"><i class="ti ti-send" aria-hidden="true"></i> Send</button>
           </div>
         </div>
         <div id="nt-message" class="nt-panel" style="display:none">
-          <textarea id="email-body" class="notes-area" placeholder="Custom message to all attendees…" style="min-height:52px;margin-bottom:6px"></textarea>
-          <div style="text-align:right"><button class="btn btn-sm" onclick="sendMeetingComm(${m.id},'message')"><i class="ti ti-send" aria-hidden="true"></i> Send</button></div>
+          <textarea id="email-body" class="notes-area" placeholder="Custom message to selected recipients…" style="min-height:52px;margin-bottom:6px"></textarea>
+          <div style="text-align:right"><button class="btn btn-sm" onclick="(()=>{const ids=[...document.querySelectorAll('.nt-recip-cb:checked')].map(x=>+x.value);sendMeetingComm(${m.id},'message',null,false,false,ids);})()"><i class="ti ti-send" aria-hidden="true"></i> Send</button></div>
         </div>`:''}
         ${isPast&&U.role!=='admin'?'<div class="alert a-warn" style="margin-top:12px"><i class="ti ti-lock" aria-hidden="true"></i>Past meetings can only be edited by admin.</div>':''}
       </div>
@@ -1846,7 +1876,16 @@ function editMeetingModal(m){
             <button class="pill${m.privacy==='private'?' active':''}" id="pill-priv" onclick="setPrivacy('private')"><i class="ti ti-eye-off" aria-hidden="true"></i> Private</button>
           </div>
         </div>
-        <div class="field" style="margin-top:14px"><label>Notes</label><textarea id="nm-notes">${esc(m.notes||'')}</textarea></div>
+        <div class="field" style="margin-top:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <label style="margin:0">Notes</label>
+            <div class="lang-toggle">
+              <button class="${isDV(m.notes||'')?'':'active'}" onclick="setNoteLang('nm-notes','en',this)">EN</button>
+              <button class="${isDV(m.notes||'')?'active':''}" onclick="setNoteLang('nm-notes','dv',this)">ދިވެހި</button>
+            </div>
+          </div>
+          <textarea id="nm-notes" class="notes-area${isDV(m.notes||'')?' dv':''}">${esc(m.notes||'')}</textarea>
+        </div>
         <div style="margin-top:14px">
           <div class="section-title">Participants</div>
           <div id="nm-participants" class="stack" style="gap:6px"></div>
@@ -2182,11 +2221,13 @@ function startNotifLoop(){
 }
 
 /* =================== NOTIFY =================== */
-async function sendMeetingComm(meetingId,type,extra,silent,skipLog){
+function toggleAllNtRecip(check){document.querySelectorAll('.nt-recip-cb').forEach(cb=>cb.checked=check);}
+async function sendMeetingComm(meetingId,type,extra,silent,skipLog,recipientIds){
   let bodyExtra=extra;
   if(type==='message'&&!silent){const el=document.getElementById('email-body');bodyExtra=el?el.value.trim():'';if(!bodyExtra){showToast('Enter a message.');return;}}
   const parts=await GET('participants',`select=*&meeting_id=eq.${meetingId}`);
   const mrows=await GET('meetings',`select=*&id=eq.${meetingId}`);const m=mrows[0]||{};
+  const partsToSend=recipientIds&&recipientIds.length?parts.filter(p=>recipientIds.includes(p.id)):parts;
   // 'schedule' sends the full invitation format (📋) with RSVP buttons
   const tgMsgType=(type==='message'||type==='schedule')?'invitation':type;
   const tgMsg=buildTgMsg(m,tgMsgType,parts,bodyExtra);
@@ -2194,7 +2235,7 @@ async function sendMeetingComm(meetingId,type,extra,silent,skipLog){
   const emailBody=tgMsg.replace(/<[^>]+>/g,'');
   const tgToken=loadTgToken();
   const emailFallback=[];let tgSent=0;
-  for(const p of parts){
+  for(const p of partsToSend){
     const s=p.staff_id?DB.staff.find(x=>x.id===p.staff_id):null;
     const chatId=s?.telegram_chat_id;
     if(tgToken&&chatId){
