@@ -2889,8 +2889,10 @@ async function updateStaff(svc_no){
       try{await DEL('staff_sections','staff_id=eq.'+staffRow.id);}catch(e){}
       if(extraSecIds.length)await Promise.all(extraSecIds.map(sid=>POST('staff_sections',{staff_id:staffRow.id,section_id:sid})));
       const accessTargetIds=Array.from(document.querySelectorAll('.ssa-target:checked')).map(c=>parseInt(c.value));
-      try{await DEL('staff_schedule_access','viewer_id=eq.'+staffRow.id);}catch(e){}
-      if(accessTargetIds.length)await Promise.all(accessTargetIds.map(tid=>POST('staff_schedule_access',{viewer_id:staffRow.id,target_id:tid})));
+      try{
+        await DEL('staff_schedule_access','viewer_id=eq.'+staffRow.id);
+        if(accessTargetIds.length)await Promise.all(accessTargetIds.map(tid=>POST('staff_schedule_access',{viewer_id:staffRow.id,target_id:tid})));
+      }catch(e){}
     }
     if(U.svc_no===svc_no){U.can_view_all=can_view_all;U.can_request_users=can_request_users;U.role=role;}
     await loadAll();closeModal();renderAdmin();showToast('Staff updated');
